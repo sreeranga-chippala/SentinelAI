@@ -1,18 +1,18 @@
 """
-models/area.py
+models/population_assessment.py
 """
 
 from dataclasses import dataclass
 
 
 @dataclass(slots=True)
-class Area:
+class PopulationAssessment:
 
     area_id: str
 
-    name: str
+    area_name: str
 
-    population: int
+    total_population: int
 
     children: int
 
@@ -24,8 +24,8 @@ class Area:
 
     rescue_requests: int
 
-    latitude: float
+    vulnerability_score: int
 
-    longitude: float
+    priority_level: str
 
-    is_flooded: bool = False
+    reason: str

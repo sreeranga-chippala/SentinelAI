@@ -1,0 +1,6 @@
+area_id,area,rainfall,river_level,humidity,forecast
+A001,RR Nagar,210,88,92,Heavy Rain
+A002,Whitefield,120,62,78,Moderate Rain
+A003,Electronic City,265,97,95,Extreme Rain
+A004,Yelahanka,75,50,65,Light Rain
+A005,Hebbal,180,84,86,Heavy Rain

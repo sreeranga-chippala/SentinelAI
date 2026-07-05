@@ -109,7 +109,7 @@ class PublicDashboard:
 
             rows.append({
 
-                "Area": weather.area,
+                "Area": weather.area_name,
 
                 "Risk": weather.risk_level,
 

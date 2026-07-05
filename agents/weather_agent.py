@@ -44,7 +44,9 @@ class WeatherAgent(BaseAgent):
 
             assessment = WeatherAnalyzer.analyze(
 
-                area=weather["area"],
+                area_id=area_id,
+
+                area_name=weather["area"],
 
                 rainfall=weather["rainfall"],
 

@@ -136,7 +136,7 @@ class CommanderDashboard:
 
             rows.append({
 
-                "Area": weather.area,
+                "Area": weather.area_name,
 
                 "Risk Level": weather.risk_level,
 

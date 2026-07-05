@@ -66,7 +66,7 @@ class PriorityAgent(BaseAgent):
 
                 area_id=area_id,
 
-                area_name=weather.area,
+                area_name=weather.area_name,
 
                 weather=weather,
 

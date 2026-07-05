@@ -1,0 +1,12 @@
+streamlit
+google-adk
+google-genai
+fastmcp
+pandas
+numpy
+plotly
+folium
+streamlit-folium
+python-dotenv
+pydantic
+networkx

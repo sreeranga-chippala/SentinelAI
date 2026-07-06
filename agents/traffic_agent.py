@@ -1,64 +1,75 @@
 """
-agents/traffic_agent.py
+SentinelAI - Traffic Wrapper Agent
 
-Traffic Agent
-
-Responsibilities
-----------------
-1. Fetch road information from TrafficServer.
-2. Analyze every road.
-3. Group RouteAssessment by area.
-4. Return the analysis results.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+Wrapper around the Google ADK Traffic Agent.
 """
 
-from agents.base_agent import BaseAgent
-from utils.traffic_analyzer import TrafficAnalyzer
+from __future__ import annotations
+from google.genai import types
+import asyncio
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+
+from adk.agents.traffic_agent import root_agent
 
 
-class TrafficAgent(BaseAgent):
+class TrafficAgent:
+    """
+    Wrapper for the ADK Traffic Agent.
+    """
 
-    def __init__(
+    def __init__(self) -> None:
+        self.session_service = InMemorySessionService()
+
+        self.runner = Runner(
+            app_name="SentinelAI",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
         self,
-        traffic_server,
-        logger=None
-    ):
+        query: str,
+    ) -> str:
+        """
+        Execute the Traffic ADK agent.
+        """
 
-        super().__init__(logger)
+        session = await self.session_service.create_session(
+            app_name="SentinelAI",
+            user_id="traffic_user",
+        )
 
-        self.traffic_server = traffic_server
+        final_response = ""
 
-    # ----------------------------------------------------------
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(text=query),
+            ],
+        )
 
-    def run(self):
+        async for event in self.runner.run_async(
+            user_id="traffic_user",
+            session_id=session.id,
+            new_message=message,
+        ):
+                    if event.content and event.content.parts:
+                        for part in event.content.parts:
+                            if getattr(part, "text", None):
+                                final_response += part.text
 
-        self.before_run()
+        return final_response.strip()
 
-        roads = self.traffic_server.get_all_roads()
+    def run(
+        self,
+        query: str,
+    ) -> str:
+        """
+        Synchronous wrapper.
+        """
 
-        results = {}
-
-        for area_id, road_list in roads.items():
-
-            area_routes = []
-
-            for road in road_list:
-
-                assessment = TrafficAnalyzer.analyze(road)
-
-                area_routes.append(assessment)
-
-                self.log(
-                    f"{road.road_name} -> "
-                    f"{assessment.route_status} "
-                    f"(Travel Time: {assessment.travel_time} mins)"
-                )
-
-            results[area_id] = area_routes
-
-        self.after_run()
-
-        return results
+        return asyncio.run(
+            self.run_async(query)
+        )

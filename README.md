@@ -51,35 +51,65 @@ The generated response includes:
 - Social media alerts
 
 ---
+## System Architecture
 
-# System Architecture
-
-SentinelAI follows a modular orchestration architecture designed for scalability and maintainability.
+The overall workflow follows a layered multi-agent orchestration architecture.
 
 ```text
-                    Streamlit Dashboard
-                           │
-                    Disaster Location
-                           │
-                    Coordinator
-                           │
-       ┌────────────┬────────────┬────────────┬────────────┐
-       │            │            │            │
- Weather MCP   Traffic MCP Population MCP Hospital MCP
-       │            │            │            │
-       └────────────┴────────────┴────────────┘
-                           │
-                     WorldState
-                           │
-                  Mission Planner Agent
-                           │
-        Priority • Allocation • Missions • Alerts
-                           │
-    Commander • Hospital • Rescue • Public Dashboards
+                               User
+                                 │
+                                 ▼
+                 Streamlit Dashboard (app.py)
+                                 │
+                                 ▼
+                           Coordinator
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        │                        │                        │
+        ▼                        ▼                        ▼
+          Executes All Wrapper Agents in Parallel
+                  (asyncio.gather)
+        │                        │                        │
+        └───────────────┬────────┴────────┬───────────────┘
+                        │                 │
+                        ▼                 ▼
+
+ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+ │ Weather Agent  │ │ Traffic Agent  │ │ Population     │ │ Hospital Agent │
+ │   (Wrapper)    │ │   (Wrapper)    │ │ Agent (Wrapper)│ │   (Wrapper)    │
+ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘
+        │                  │                  │                  │
+        ▼                  ▼                  ▼                  ▼
+ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+ │  Weather ADK   │ │  Traffic ADK   │ │ Population ADK │ │ Hospital ADK   │
+ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘
+        │                  │                  │                  │
+        ▼                  ▼                  ▼                  ▼
+ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+ │  Weather MCP   │ │  Traffic MCP   │ │ Population MCP │ │ Hospital MCP   │
+ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘
+        │                  │                  │                  │
+        └──────────────────┴──────────┬───────┴──────────────────┘
+                                      │
+                                      ▼
+                    Coordinator Collects MCP Results
+                                      │
+                                      ▼
+                      Updates Shared WorldState Memory
+                                      │
+                                      ▼
+             Mission Planner Agent (Only Gemini Reasoning)
+                                      │
+                                      ▼
+       Priority Assessment • Resource Allocation • Mission Plan
+              Public Alerts • SMS • Radio • TV • Social Media
+                                      │
+                                      ▼
+                      Updates Shared WorldState Memory
+                                      │
+                                      ▼
+                    Streamlit Dashboard Displays Results
 ```
-
-The **Coordinator** orchestrates the execution of all agents while the **WorldState** acts as a centralized shared state that stores system inputs, generated knowledge, decisions, metrics, logs, and historical snapshots. This separation of responsibilities ensures that agents remain independent and stateless while maintaining a consistent global view of the disaster response process.
-
 ---
 
 # Key Technologies

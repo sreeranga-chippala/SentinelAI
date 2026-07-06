@@ -1,73 +1,90 @@
 """
-agents/weather_agent.py
+SentinelAI Weather Wrapper Agent
 
-Weather Agent
-
-Responsibilities
-----------------
-1. Fetch weather data from WeatherServer.
-2. Analyze weather for each area.
-3. Return RiskAssessment objects.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator is responsible for committing results.
+Coordinator interacts only with this wrapper.
 """
 
-from agents.base_agent import BaseAgent
-from utils.weather_analyzer import WeatherAnalyzer
+from __future__ import annotations
+
+import asyncio
+from uuid import uuid4
+
+from google.genai import types
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+
+from adk.agents.weather_agent import root_agent
 
 
-class WeatherAgent(BaseAgent):
+class WeatherAgent:
+    """
+    Wrapper around the Google ADK Weather Agent.
+    """
 
-    def __init__(
+    def __init__(self) -> None:
+
+        self.app_name = "SentinelAI"
+
+        self.user_id = "system"
+
+        self.session_service = InMemorySessionService()
+
+        self.runner = Runner(
+            agent=root_agent,
+            app_name=self.app_name,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
         self,
-        weather_server,
-        logger=None
-    ):
+        query: str,
+    ) -> str:
 
-        super().__init__(logger)
+        session = await self.session_service.create_session(
+            app_name=self.app_name,
+            user_id=self.user_id,
+            session_id=str(uuid4()),
+        )
 
-        self.weather_server = weather_server
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(
+                    text=query,
+                )
+            ],
+        )
 
-    # ----------------------------------------------------------
+        final_response = ""
 
-    def run(self):
+        async for event in self.runner.run_async(
+            session_id=session.id,
+            user_id=self.user_id,
+            new_message=message,
+        ):
 
-        self.before_run()
+            if event.content is None:
+                continue
 
-        weather_data = self.weather_server.get_all_weather()
+            if event.content.parts is None:
+                continue
 
-        assessments = {}
+            for part in event.content.parts:
 
-        for area_id, weather in weather_data.items():
+                if getattr(part, "text", None):
 
-            assessment = WeatherAnalyzer.analyze(
+                    final_response += part.text
 
-                area_id=area_id,
+        return final_response.strip()
 
-                area_name=weather["area"],
+    def run(
+        self,
+        query: str,
+    ) -> str:
 
-                rainfall=weather["rainfall"],
-
-                river_level=weather["river_level"],
-
-                humidity=weather["humidity"],
-
-                forecast=weather["forecast"]
-
+        return asyncio.run(
+            self.run_async(
+                query,
             )
-
-            assessments[area_id] = assessment
-
-            self.log(
-
-                f"{weather['area']} -> "
-                f"{assessment.risk_level} "
-                f"(Score={assessment.risk_score})"
-
-            )
-
-        self.after_run()
-
-        return assessments
+        )

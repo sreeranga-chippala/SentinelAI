@@ -23,13 +23,12 @@ from agents.allocation_agent import AllocationAgent
 from agents.decision_agent import DecisionAgent
 from agents.communication_agent import CommunicationAgent
 
-from mcp.weather_server import WeatherServer
-from mcp.hospital_server import HospitalServer
-from mcp.traffic_server import TrafficServer
-from mcp.population_server import PopulationServer
-from mcp.resource_server import ResourceServer
-from mcp.notification_server import NotificationServer
-
+from mcp_servers.weather.server import WeatherServer
+from mcp_servers.hospital.server import HospitalServer
+from mcp_servers.traffic.server import TrafficServer
+from mcp_servers.population.server import PopulationServer
+from mcp_servers.resource.server import ResourceServer
+from mcp_servers.notification.server import NotificationServer
 
 class Coordinator:
 

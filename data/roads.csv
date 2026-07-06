@@ -1,8 +1,0 @@
-road_id,road_name,area_id,start_area,end_area,traffic_level,water_level,is_blocked,travel_time
-R001,Mysore Road,A001,RR Nagar,Kengeri,High,1.2,False,35
-R002,NICE Road,A001,RR Nagar,Electronic City,Medium,0.5,False,28
-R003,ITPL Main Road,A002,Whitefield,Marathahalli,High,0.8,False,32
-R004,Old Airport Road,A002,Whitefield,Indiranagar,Medium,0.3,False,30
-R005,Hosur Road,A003,Electronic City,Silk Board,High,1.8,True,55
-R006,Bellary Road,A004,Yelahanka,Hebbal,Low,0.2,False,18
-R007,Outer Ring Road,A005,Hebbal,Nagawara,Medium,0.6,False,24

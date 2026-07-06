@@ -1,8 +1,0 @@
-hospital_id,name,area_id,latitude,longitude,total_beds,available_beds,icu_beds,emergency_capacity
-H001,RR Nagar General Hospital,A001,12.9279,77.5207,250,80,20,40
-H002,BGS Hospital,A001,12.9155,77.5350,180,60,15,30
-H003,Manipal Whitefield,A002,12.9698,77.7499,300,120,35,60
-H004,Sakra World Hospital,A002,12.9141,77.6846,220,90,25,45
-H005,Narayana Health,A003,12.8399,77.6638,450,170,50,90
-H006,Aster CMI,A004,13.0452,77.5910,280,110,30,50
-H007,Baptist Hospital,A005,13.0352,77.5970,240,95,22,40

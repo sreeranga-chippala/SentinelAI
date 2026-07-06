@@ -13,11 +13,13 @@ Architecture Rules
 
 from copy import deepcopy
 from datetime import datetime
-
+from threading import Lock
+import json
 
 class WorldState:
 
     def __init__(self):
+        self._lock = Lock()
         self.reset()
 
     # ==========================================================
@@ -81,6 +83,7 @@ class WorldState:
             # --------------------------------------------------
             # SYSTEM
             # --------------------------------------------------
+            "history": [],
 
             "system": {
 
@@ -91,6 +94,8 @@ class WorldState:
                 "last_updated": None,
 
                 "logs": [],
+
+                "agent_metrics": {},
 
                 "statistics": {
 
@@ -115,7 +120,11 @@ class WorldState:
         if key not in self.state["input"]:
             raise KeyError(f"Invalid input key: {key}")
 
-        self.state["input"][key] = value
+        with self._lock:
+
+            self.state["input"][key] = value
+
+            self._touch()
 
         self._touch()
 
@@ -234,13 +243,15 @@ class WorldState:
 
     def add_log(self, message):
 
-        self.state["system"]["logs"].append({
+        with self._lock:
 
-            "time": datetime.now(),
+            self.state["system"]["logs"].append({
 
-            "message": message
+                "time": datetime.now().isoformat(),
 
-        })
+                "message": message
+
+            })
 
     def get_logs(self):
 
@@ -248,7 +259,27 @@ class WorldState:
 
     def clear_logs(self):
 
-        self.state["system"]["logs"].clear()
+        with self._lock:
+
+            self.state["system"]["logs"].clear()
+
+            self._touch()
+
+    def update_agent_metric(self, agent, execution_time, success, ):
+
+            with self._lock:
+
+                self.state["system"]["agent_metrics"][agent] = {
+
+                    "execution_time": execution_time,
+
+                    "success": success,
+
+                    "updated": datetime.now().isoformat(),
+
+                }
+
+                self._touch()
 
     # ==========================================================
     # COMPLETE STATE
@@ -264,4 +295,53 @@ class WorldState:
 
     def _touch(self):
 
-        self.state["system"]["last_updated"] = datetime.now()
+        self.state["system"]["last_updated"] = (datetime.now().isoformat())
+
+    def save_cycle_snapshot(self):
+
+        with self._lock:
+
+            snapshot = {
+
+                "cycle": self.get_cycle(),
+
+                "timestamp": datetime.now().isoformat(),
+
+                "input": deepcopy(self.state["input"]),
+
+                "knowledge": deepcopy(self.state["knowledge"]),
+
+                "decision": deepcopy(self.state["decision"]),
+
+                "system": deepcopy(self.state["system"]),
+
+            }
+
+            self.state["history"].append(snapshot)
+            self._touch()
+
+    def export_json(
+        self,
+        filename="world_state.json",
+    ):
+
+        with self._lock:
+
+            with open(
+                filename,
+                "w",
+                encoding="utf-8",
+            ) as f:
+
+                json.dump(
+                    self.state,
+                    f,
+                    indent=4,
+                )
+        def load_json(self, filename,):
+
+            with self._lock:
+
+                with open(filename, "r",encoding="utf-8",) as f:
+
+                    self.state = json.load(f)

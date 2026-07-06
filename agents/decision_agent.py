@@ -1,83 +1,63 @@
 """
-agents/decision_agent.py
-
-Decision Agent
-
-Responsibilities
-----------------
-1. Receive PriorityAssessment and AllocationPlan.
-2. Generate executable Mission objects.
-3. Return Mission objects.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+SentinelAI Decision Agent Wrapper
 """
 
-from agents.base_agent import BaseAgent
+import asyncio
 
-from utils.decision_engine import DecisionEngine
+from google.genai.types import Content
+from google.genai.types import Part
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+
+from adk.agents.decision_agent import root_agent
 
 
-class DecisionAgent(BaseAgent):
+class DecisionAgent:
 
-    def __init__(
-        self,
-        logger=None
-    ):
+    def __init__(self):
 
-        super().__init__(logger)
+        self.session_service = InMemorySessionService()
 
-    # ----------------------------------------------------------
+        self.runner = Runner(
+            app_name="decision_app",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
 
-    def run(
-        self,
-        priority_results,
-        allocation_results
-    ):
+    async def run_async(self, query: str) -> str:
 
-        self.before_run()
+        session = await self.session_service.create_session(
+            app_name="decision_app",
+            user_id="user",
+        )
 
-        mission_results = {}
+        message = Content(
+            role="user",
+            parts=[
+                Part(text=query),
+            ],
+        )
 
-        for area_id, allocation in allocation_results.items():
+        final_response = ""
 
-            priority = priority_results.get(area_id)
+        async for event in self.runner.run_async(
+            user_id="user",
+            session_id=session.id,
+            new_message=message,
+        ):
 
-            if priority is None:
+            if event.content:
 
-                self.log(
-                    f"Skipping {area_id}: PriorityAssessment not found."
-                )
+                for part in event.content.parts:
 
-                continue
+                    if getattr(part, "text", None):
+                        final_response += part.text
 
-            if not allocation.success:
+        return final_response.strip()
 
-                self.log(
-                    f"{priority.area_name} -> Allocation failed."
-                )
+    def run(self, query: str) -> str:
 
-                continue
-
-            mission = DecisionEngine.create_mission(
-
-                priority=priority,
-
-                allocation=allocation
-
-            )
-
-            mission_results[area_id] = mission
-
-            self.log(
-
-                f"Mission created -> "
-
-                f"{mission.area_name}"
-
-            )
-
-        self.after_run()
-
-        return mission_results
+        return asyncio.run(
+            self.run_async(query)
+        )

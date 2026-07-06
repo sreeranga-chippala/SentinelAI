@@ -11,7 +11,6 @@ Visible To:
 - Emergency Response Teams
 """
 
-import pandas as pd
 import streamlit as st
 
 
@@ -27,247 +26,186 @@ class RescueDashboard:
 
         st.title("🚑 Rescue Operations Dashboard")
 
-        knowledge = self.world_state.get_knowledge_state()
+        state = self.world_state.get_state()
 
-        decision = self.world_state.get_decision_state()
+        system = state["system"]
 
-        self._summary(decision)
-
-        self._mission_table(decision)
-
-        self._resource_table(decision)
-
-        self._route_table(knowledge)
-
-        self._priority_table(knowledge)
-
-    # =========================================================
-
-    def _summary(self, decision):
-
-        allocations = decision["resource_allocations"]
-
-        missions = decision["missions"]
-
-        rescue_teams = 0
-        boats = 0
-        ambulances = 0
-        helicopters = 0
-
-        for allocation in allocations.values():
-
-            rescue_teams += allocation.rescue_teams
-            boats += allocation.boats
-            ambulances += allocation.ambulances
-            helicopters += allocation.helicopters
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-
-        c1.metric(
-            "Active Missions",
-            len(missions)
-        )
-
-        c2.metric(
-            "Rescue Teams",
-            rescue_teams
-        )
-
-        c3.metric(
-            "Boats",
-            boats
-        )
-
-        c4.metric(
-            "Ambulances",
-            ambulances
-        )
-
-        c5.metric(
-            "Helicopters",
-            helicopters
-        )
+        self._summary(system)
 
         st.divider()
 
-    # =========================================================
+        col1, col2 = st.columns(2)
 
-    def _mission_table(self, decision):
+        with col1:
 
-        st.subheader("Assigned Missions")
+            self._priority(state)
 
-        rows = []
+            self._traffic(state)
 
-        for mission in decision["missions"].values():
+        with col2:
 
-            rows.append({
+            self._weather(state)
 
-                "Mission ID": mission.mission_id,
+            self._hospitals(state)
 
-                "Area": mission.area_name,
+        st.divider()
 
-                "Priority": mission.priority_level,
+        self._resource_allocations(state)
 
-                "Hospital": mission.assigned_hospital,
+        st.divider()
 
-                "Teams": mission.rescue_teams,
+        self._missions(state)
 
-                "Boats": mission.boats,
+        st.divider()
 
-                "Ambulances": mission.ambulances,
-
-                "Helicopters": mission.helicopters,
-
-                "Status": mission.status
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
-
-        else:
-
-            st.info("No rescue missions assigned.")
+        self._logs(system)
 
     # =========================================================
 
-    def _resource_table(self, decision):
+    def _summary(self, system):
 
-        st.subheader("Resource Allocation")
+        st.subheader("Rescue Operations Summary")
 
-        rows = []
+        statistics = system["statistics"]
 
-        for allocation in decision["resource_allocations"].values():
+        c1, c2, c3, c4 = st.columns(4)
 
-            rows.append({
-
-                "Area": allocation.area_name,
-
-                "Hospital": allocation.assigned_hospital,
-
-                "Beds": allocation.beds_allocated,
-
-                "Rescue Teams": allocation.rescue_teams,
-
-                "Boats": allocation.boats,
-
-                "Ambulances": allocation.ambulances,
-
-                "Helicopters": allocation.helicopters,
-
-                "Food Packets": allocation.food_packets,
-
-                "Medical Kits": allocation.medical_kits
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
-
-        else:
-
-            st.info("No resources allocated.")
-
-    # =========================================================
-
-    def _route_table(self, knowledge):
-
-        st.subheader("Road Conditions")
-
-        rows = []
-
-        for routes in knowledge["route_status"].values():
-
-            for route in routes:
-
-                rows.append({
-
-                    "Road": route.road_name,
-
-                    "Status": route.route_status,
-
-                    "Travel Time (mins)": route.travel_time
-
-                })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
-
-        else:
-
-            st.info("No route information available.")
-
-    # =========================================================
-
-    def _priority_table(self, knowledge):
-
-        st.subheader("Area Priorities")
-
-        rows = []
-
-        priorities = sorted(
-
-            knowledge["priority_scores"].values(),
-
-            key=lambda x: x.priority_score,
-
-            reverse=True
-
+        c1.metric(
+            "Simulation Cycle",
+            system["cycle"],
         )
 
-        for priority in priorities:
+        c2.metric(
+            "Areas Processed",
+            statistics["areas_processed"],
+        )
 
-            rows.append({
+        c3.metric(
+            "Missions",
+            statistics["missions_created"],
+        )
 
-                "Area": priority.area_name,
+        c4.metric(
+            "Alerts",
+            statistics["alerts_sent"],
+        )
 
-                "Priority": priority.priority_level,
+        st.caption(
+            f"System Status : {system['status']}"
+        )
 
-                "Score": priority.priority_score,
+    # =========================================================
 
-                "Recommended Action": priority.recommended_action
+    def _priority(self, state):
 
-            })
+        st.subheader("🚨 Priority Analysis")
 
-        if rows:
+        priority = state["knowledge"]["priority_scores"]
 
-            st.dataframe(
+        if priority:
 
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(priority)
 
         else:
 
-            st.info("No priority assessments available.")
+            st.info("Priority analysis unavailable.")
+
+    # =========================================================
+
+    def _traffic(self, state):
+
+        st.subheader("🚦 Traffic Conditions")
+
+        traffic = state["input"]["roads"]
+
+        if traffic:
+
+            st.markdown(traffic)
+
+        else:
+
+            st.info("Traffic information unavailable.")
+
+    # =========================================================
+
+    def _weather(self, state):
+
+        st.subheader("🌧 Weather Conditions")
+
+        weather = state["input"]["weather"]
+
+        if weather:
+
+            st.markdown(weather)
+
+        else:
+
+            st.info("Weather information unavailable.")
+
+    # =========================================================
+
+    def _hospitals(self, state):
+
+        st.subheader("🏥 Nearby Hospitals")
+
+        hospitals = state["input"]["hospitals"]
+
+        if hospitals:
+
+            st.markdown(hospitals)
+
+        else:
+
+            st.info("Hospital information unavailable.")
+
+    # =========================================================
+
+    def _resource_allocations(self, state):
+
+        st.subheader("🚒 Resource Allocation")
+
+        allocation = state["decision"]["resource_allocations"]
+
+        if allocation:
+
+            st.markdown(allocation)
+
+        else:
+
+            st.info("No resource allocation available.")
+
+    # =========================================================
+
+    def _missions(self, state):
+
+        st.subheader("🎯 Rescue Missions")
+
+        missions = state["decision"]["missions"]
+
+        if missions:
+
+            st.markdown(missions)
+
+        else:
+
+            st.info("No rescue missions available.")
+
+    # =========================================================
+
+    def _logs(self, system):
+
+        st.subheader("📜 Rescue Logs")
+
+        logs = system["logs"]
+
+        if not logs:
+
+            st.info("No logs available.")
+
+            return
+
+        for log in reversed(logs):
+
+            with st.expander(log["time"]):
+
+                st.write(log["message"])

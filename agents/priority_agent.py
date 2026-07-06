@@ -1,93 +1,71 @@
 """
-agents/priority_agent.py
+SentinelAI - Priority Wrapper Agent
 
-Priority Agent
-
-Responsibilities
-----------------
-1. Read analysis results.
-2. Build AreaContext for each area.
-3. Generate PriorityAssessment.
-4. Return the priority assessments.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+Wrapper around the Google ADK Priority Agent.
 """
 
-from agents.base_agent import BaseAgent
+from __future__ import annotations
 
-from models.area_context import AreaContext
+import asyncio
 
-from utils.priority_analyzer import PriorityAnalyzer
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from adk.agents.priority_agent import root_agent
 
 
-class PriorityAgent(BaseAgent):
+class PriorityAgent:
+    """
+    Wrapper for the ADK Priority Agent.
+    """
 
-    def __init__(self, logger=None):
+    def __init__(self) -> None:
 
-        super().__init__(logger)
+        self.session_service = InMemorySessionService()
 
-    # ----------------------------------------------------------
+        self.runner = Runner(
+            app_name="SentinelAI",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
+        self,
+        query: str,
+    ) -> str:
+
+        session = await self.session_service.create_session(
+            app_name="SentinelAI",
+            user_id="priority_user",
+        )
+
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(text=query),
+            ],
+        )
+
+        final_response = ""
+
+        async for event in self.runner.run_async(
+            user_id="priority_user",
+            session_id=session.id,
+            new_message=message,
+        ):
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if getattr(part, "text", None):
+                        final_response += part.text
+
+        return final_response.strip()
 
     def run(
         self,
-        weather_results,
-        population_results,
-        hospital_results,
-        route_results
-    ):
+        query: str,
+    ) -> str:
 
-        self.before_run()
-
-        priorities = {}
-
-        area_ids = weather_results.keys()
-
-        for area_id in area_ids:
-
-            weather = weather_results.get(area_id)
-
-            population = population_results.get(area_id)
-
-            hospitals = hospital_results.get(area_id, [])
-
-            routes = route_results.get(area_id, [])
-
-            if weather is None or population is None:
-
-                self.log(
-                    f"Skipping {area_id}: Missing analysis data."
-                )
-
-                continue
-
-            context = AreaContext(
-
-                area_id=area_id,
-
-                area_name=weather.area_name,
-
-                weather=weather,
-
-                population=population,
-
-                nearby_routes=routes,
-
-                nearby_hospitals=hospitals
-
-            )
-
-            assessment = PriorityAnalyzer.analyze(context)
-
-            priorities[area_id] = assessment
-
-            self.log(
-                f"{assessment.area_name} -> "
-                f"{assessment.priority_level} "
-                f"(Score={assessment.priority_score})"
-            )
-
-        self.after_run()
-
-        return priorities
+        return asyncio.run(
+            self.run_async(query)
+        )

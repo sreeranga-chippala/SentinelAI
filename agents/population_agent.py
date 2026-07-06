@@ -1,57 +1,74 @@
 """
-agents/population_agent.py
+SentinelAI - Population Wrapper Agent
 
-Population Agent
-
-Responsibilities
-----------------
-1. Fetch population information from PopulationServer.
-2. Analyze population vulnerability for each area.
-3. Return PopulationAssessment objects.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+Wrapper around the Google ADK Population Agent.
 """
 
-from agents.base_agent import BaseAgent
-from utils.population_analyzer import PopulationAnalyzer
+from __future__ import annotations
+
+import asyncio
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from adk.agents.population_agent import root_agent
 
 
-class PopulationAgent(BaseAgent):
+class PopulationAgent:
+    """
+    Wrapper for the ADK Population Agent.
+    """
 
-    def __init__(
+    def __init__(self) -> None:
+
+        self.session_service = InMemorySessionService()
+
+        self.runner = Runner(
+            app_name="SentinelAI",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
         self,
-        population_server,
-        logger=None
-    ):
+        query: str,
+    ) -> str:
 
-        super().__init__(logger)
+        session = await self.session_service.create_session(
+            app_name="SentinelAI",
+            user_id="population_user",
+        )
 
-        self.population_server = population_server
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(text=query),
+            ],
+        )
 
-    # ----------------------------------------------------------
+        final_response = ""
 
-    def run(self):
+        async for event in self.runner.run_async(
+            user_id="population_user",
+            session_id=session.id,
+            new_message=message,
+        ):
 
-        self.before_run()
+            if event.content and event.content.parts:
 
-        areas = self.population_server.get_all_population()
+                for part in event.content.parts:
 
-        results = {}
+                    if getattr(part, "text", None):
+                        final_response += part.text
 
-        for area_id, area in areas.items():
+        return final_response.strip()
 
-            assessment = PopulationAnalyzer.analyze(area)
+    def run(
+        self,
+        query: str,
+    ) -> str:
 
-            results[area_id] = assessment
-
-            self.log(
-                f"{area.name} -> "
-                f"{assessment.priority_level} "
-                f"(Score={assessment.vulnerability_score})"
-            )
-
-        self.after_run()
-
-        return results
+        return asyncio.run(
+            self.run_async(query)
+        )

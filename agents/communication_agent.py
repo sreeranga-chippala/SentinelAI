@@ -1,76 +1,57 @@
 """
-agents/communication_agent.py
-
-Communication Agent
-
-Responsibilities
-----------------
-1. Receive Mission objects.
-2. Generate PublicAlert objects.
-3. Send alerts using NotificationServer.
-4. Return PublicAlert objects.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+Communication Agent Wrapper
 """
 
-from agents.base_agent import BaseAgent
+import asyncio
 
-from utils.communication_engine import CommunicationEngine
+from google.genai.types import Content
+from google.genai.types import Part
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+
+from adk.agents.communication_agent import root_agent
 
 
-class CommunicationAgent(BaseAgent):
+class CommunicationAgent:
 
-    def __init__(
-        self,
-        notification_server,
-        logger=None
-    ):
+    def __init__(self):
 
-        super().__init__(logger)
+        self.runner = Runner(
+            app_name="communication_agent",
+            agent=root_agent,
+            session_service=InMemorySessionService(),
+        )
 
-        self.notification_server = notification_server
+    async def run_async(self, query: str):
 
-    # ----------------------------------------------------------
+        session = await self.runner.session_service.create_session(
+            app_name="communication_agent",
+            user_id="user",
+        )
 
-    def run(
-        self,
-        mission_results
-    ):
+        final_response = ""
 
-        self.before_run()
+        async for event in self.runner.run_async(
+            user_id="user",
+            session_id=session.id,
+            new_message=Content(
+                role="user",
+                parts=[Part(text=query)],
+            ),
+        ):
 
-        alert_results = {}
+            if event.content:
 
-        for area_id, mission in mission_results.items():
+                for part in event.content.parts:
 
-            alert = CommunicationEngine.create_alert(
-                mission
-            )
+                    if hasattr(part, "text") and part.text:
+                        final_response += part.text
 
-            success = self.notification_server.send_alert(
-                alert
-            )
+        return final_response
 
-            if success:
+    def run(self, query: str):
 
-                alert.status = "SENT"
-
-            else:
-
-                alert.status = "FAILED"
-
-            alert_results[area_id] = alert
-
-            self.log(
-
-                f"{mission.area_name} -> "
-
-                f"{alert.status}"
-
-            )
-
-        self.after_run()
-
-        return alert_results
+        return asyncio.run(
+            self.run_async(query)
+        )

@@ -1,14 +1,13 @@
 """
 dashboards/public.py
 
-Public Dashboard
+Public Safety Dashboard
 
 Visible To:
 - Citizens
 - General Public
 """
 
-import pandas as pd
 import streamlit as st
 
 
@@ -24,204 +23,117 @@ class PublicDashboard:
 
         st.title("📢 Public Safety Dashboard")
 
-        knowledge = self.world_state.get_knowledge_state()
+        state = self.world_state.get_state()
 
-        decision = self.world_state.get_decision_state()
-
-        self._active_alerts(decision)
-
-        self._weather(knowledge)
-
-        self._safe_routes(knowledge)
-
-        self._nearest_hospitals(knowledge)
-
-        self._emergency_contacts()
-
-        self._instructions()
-
-    # =========================================================
-
-    def _active_alerts(self, decision):
-
-        st.subheader("🚨 Active Alerts")
-
-        alerts = decision["public_alerts"]
-
-        if not alerts:
-
-            st.success("✅ No active emergency alerts.")
-
-            return
-
-        for alert in alerts.values():
-
-            if alert.priority_level == "Extreme":
-
-                st.error(
-
-                    f"""
-### {alert.title}
-
-**Area:** {alert.area_name}
-
-{alert.message}
-"""
-                )
-
-            elif alert.priority_level == "Critical":
-
-                st.warning(
-
-                    f"""
-### {alert.title}
-
-**Area:** {alert.area_name}
-
-{alert.message}
-"""
-                )
-
-            else:
-
-                st.info(
-
-                    f"""
-### {alert.title}
-
-**Area:** {alert.area_name}
-
-{alert.message}
-"""
-                )
+        self._public_alerts(state)
 
         st.divider()
 
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            self._weather(state)
+
+            self._traffic(state)
+
+        with col2:
+
+            self._hospitals(state)
+
+            self._missions(state)
+
+        st.divider()
+
+        self._emergency_contacts()
+
+        st.divider()
+
+        self._instructions()
+
+        st.divider()
+
+        self._sos()
+
     # =========================================================
 
-    def _weather(self, knowledge):
+    def _public_alerts(self, state):
 
-        st.subheader("🌧 Weather Conditions")
+        st.subheader("🚨 Public Alerts")
 
-        rows = []
+        alerts = state["decision"]["public_alerts"]
 
-        for weather in knowledge["risk_scores"].values():
+        if alerts:
 
-            rows.append({
+            st.error(alerts)
 
-                "Area": weather.area_name,
+        else:
 
-                "Risk": weather.risk_level,
+            st.success("No active public alerts.")
 
-                "Rainfall (mm)": weather.rainfall,
+    # =========================================================
 
-                "River Level": weather.river_level,
+    def _weather(self, state):
 
-                "Forecast": weather.forecast
+        st.subheader("🌦 Current Weather")
 
-            })
+        weather = state["input"]["weather"]
 
-        if rows:
+        if weather:
 
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                hide_index=True,
-
-                use_container_width=True
-
-            )
+            st.markdown(weather)
 
         else:
 
             st.info("Weather information unavailable.")
 
-        st.divider()
-
     # =========================================================
 
-    def _safe_routes(self, knowledge):
+    def _traffic(self, state):
 
-        st.subheader("🛣 Safe Routes")
+        st.subheader("🚦 Traffic Advisory")
 
-        rows = []
+        traffic = state["input"]["roads"]
 
-        for routes in knowledge["route_status"].values():
+        if traffic:
 
-            for route in routes:
-
-                if route.route_status != "Blocked":
-
-                    rows.append({
-
-                        "Road": route.road_name,
-
-                        "Status": route.route_status,
-
-                        "Travel Time": route.travel_time
-
-                    })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                hide_index=True,
-
-                use_container_width=True
-
-            )
+            st.markdown(traffic)
 
         else:
 
-            st.error("No safe routes available.")
-
-        st.divider()
+            st.info("Traffic information unavailable.")
 
     # =========================================================
 
-    def _nearest_hospitals(self, knowledge):
+    def _hospitals(self, state):
 
         st.subheader("🏥 Nearby Hospitals")
 
-        rows = []
+        hospitals = state["input"]["hospitals"]
 
-        for hospitals in knowledge["hospital_status"].values():
+        if hospitals:
 
-            for hospital in hospitals:
-
-                if hospital.available_beds > 0:
-
-                    rows.append({
-
-                        "Hospital": hospital.name,
-
-                        "Available Beds": hospital.available_beds,
-
-                        "Status": hospital.status
-
-                    })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                hide_index=True,
-
-                use_container_width=True
-
-            )
+            st.markdown(hospitals)
 
         else:
 
-            st.warning("No hospitals currently available.")
+            st.info("Hospital information unavailable.")
 
-        st.divider()
+    # =========================================================
+
+    def _missions(self, state):
+
+        st.subheader("🚑 Rescue Mission Updates")
+
+        missions = state["decision"]["missions"]
+
+        if missions:
+
+            st.markdown(missions)
+
+        else:
+
+            st.info("No rescue missions announced.")
 
     # =========================================================
 
@@ -229,9 +141,9 @@ class PublicDashboard:
 
         st.subheader("☎ Emergency Contacts")
 
-        col1, col2 = st.columns(2)
+        c1, c2 = st.columns(2)
 
-        with col1:
+        with c1:
 
             st.info("🚑 Ambulance : 108")
 
@@ -239,41 +151,58 @@ class PublicDashboard:
 
             st.info("🔥 Fire : 101")
 
-        with col2:
+        with c2:
 
             st.info("🌊 Disaster Management : 1070")
 
-            st.info("👩 Women Helpline : 1091")
-
             st.info("🆘 National Emergency : 112")
 
-        st.divider()
+            st.info("👩 Women Helpline : 1091")
 
     # =========================================================
 
     def _instructions(self):
 
-        st.subheader("📖 Safety Instructions")
+        st.subheader("📖 Public Safety Instructions")
 
-        st.markdown("""
+        st.markdown(
+            """
 - Stay calm and follow official instructions.
-- Move to higher ground immediately if evacuation is advised.
-- Do not drive through flooded roads.
-- Keep drinking water, medicines and essential documents ready.
-- Switch off electricity before leaving your home.
-- Use emergency numbers only for genuine emergencies.
-- Follow updates from local authorities.
-        """)
+- Avoid flooded or damaged roads.
+- Keep emergency medicines ready.
+- Carry drinking water and essential supplies.
+- Follow evacuation orders immediately.
+- Keep your mobile phone charged.
+- Stay connected with official announcements.
+- Use emergency numbers only when required.
+"""
+        )
 
-        st.divider()
+    # =========================================================
 
-        st.subheader("🆘 SOS")
+    def _sos(self):
+
+        st.subheader("🆘 Emergency SOS")
+
+        st.warning(
+            "Press the button below only during a real emergency."
+        )
 
         if st.button(
-            "SEND SOS REQUEST",
-            use_container_width=True
+
+            "🚨 SEND SOS REQUEST",
+
+            use_container_width=True,
+
+            type="primary",
+
         ):
 
             st.success(
-                "SOS request has been sent to the Emergency Control Center."
+                """
+SOS request has been generated.
+
+Emergency Control Center has been notified.
+Please keep your phone reachable.
+"""
             )

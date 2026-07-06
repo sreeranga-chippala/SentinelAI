@@ -1,34 +1,32 @@
 """
-coordinator.py
+SentinelAI Coordinator
 
-Central Orchestrator of SentinelAI
+Coordinator
+    ↓
+Wrapper Agents
+    ↓
+ADK
+    ↓
+MCP
 
-Responsibilities
-----------------
-1. Execute all agents in the correct order.
-2. Pass outputs between agents.
-3. Commit results to WorldState.
-4. Increment simulation cycle.
-
-NOTE:
-Coordinator is the ONLY component allowed to modify WorldState.
+Production Version
 """
 
+from __future__ import annotations
+
+import asyncio
+import time
+
 from agents.weather_agent import WeatherAgent
-from agents.hospital_agent import HospitalAgent
 from agents.traffic_agent import TrafficAgent
 from agents.population_agent import PopulationAgent
+from agents.hospital_agent import HospitalAgent
+
 from agents.priority_agent import PriorityAgent
 from agents.allocation_agent import AllocationAgent
 from agents.decision_agent import DecisionAgent
 from agents.communication_agent import CommunicationAgent
 
-from mcp_servers.weather.server import WeatherServer
-from mcp_servers.hospital.server import HospitalServer
-from mcp_servers.traffic.server import TrafficServer
-from mcp_servers.population.server import PopulationServer
-from mcp_servers.resource.server import ResourceServer
-from mcp_servers.notification.server import NotificationServer
 
 class Coordinator:
 
@@ -36,274 +34,249 @@ class Coordinator:
 
         self.world_state = world_state
 
-        # =====================================================
-        # MCP SERVERS
-        # =====================================================
+        self.weather = WeatherAgent()
+        self.traffic = TrafficAgent()
+        self.population = PopulationAgent()
+        self.hospital = HospitalAgent()
 
-        self.weather_server = WeatherServer()
+        self.priority = PriorityAgent()
+        self.allocation = AllocationAgent()
+        self.decision = DecisionAgent()
+        self.communication = CommunicationAgent()
 
-        self.hospital_server = HospitalServer()
+    async def _run_agent(
+        self,
+        name: str,
+        agent,
+        query: str,
+    ):
 
-        self.traffic_server = TrafficServer()
+        start = time.perf_counter()
 
-        self.population_server = PopulationServer()
+        try:
 
-        self.resource_server = ResourceServer()
+            result = await asyncio.to_thread(
+                agent.run,
+                query,
+            )
 
-        self.notification_server = NotificationServer()
+            success = True
 
-        # =====================================================
-        # AGENTS
-        # =====================================================
+        except Exception as exc:
 
-        self.weather_agent = WeatherAgent(
-            weather_server=self.weather_server
+            result = f"ERROR: {exc}"
+            success = False
+
+        elapsed = round(
+            time.perf_counter() - start,
+            2,
         )
 
-        self.hospital_agent = HospitalAgent(
-            hospital_server=self.hospital_server
+        self.world_state.add_log(
+            f"{name} completed "
+            f"(success={success}) "
+            f"in {elapsed}s"
         )
 
-        self.traffic_agent = TrafficAgent(
-            traffic_server=self.traffic_server
-        )
+        return result
 
-        self.population_agent = PopulationAgent(
-            population_server=self.population_server
-        )
-
-        self.priority_agent = PriorityAgent()
-
-        self.allocation_agent = AllocationAgent(
-            resource_server=self.resource_server
-        )
-
-        self.decision_agent = DecisionAgent()
-
-        self.communication_agent = CommunicationAgent(
-            notification_server=self.notification_server
-        )
-
-    # =========================================================
-
-    def execute_cycle(self):
+    async def execute_cycle(
+        self,
+        disaster_area: str,
+    ):
 
         self.world_state.update_system(
             "status",
-            "RUNNING"
+            "RUNNING",
         )
-
-        # =====================================================
-        # ANALYSIS LAYER
-        # =====================================================
-
-        weather_results = self.weather_agent.run()
-
-        hospital_results = self.hospital_agent.run()
-
-        traffic_results = self.traffic_agent.run()
-
-        population_results = self.population_agent.run()
-
-        # =====================================================
-        # COMMIT ANALYSIS
-        # =====================================================
-
-        self.world_state.update_knowledge(
-            "risk_scores",
-            weather_results
-        )
-
-        self.world_state.update_knowledge(
-            "hospital_status",
-            hospital_results
-        )
-
-        self.world_state.update_knowledge(
-            "route_status",
-            traffic_results
-        )
-
-        self.world_state.update_knowledge(
-            "population_status",
-            population_results
-        )
-
-        # =====================================================
-        # PRIORITY
-        # =====================================================
-
-        priority_results = self.priority_agent.run(
-
-            weather_results=weather_results,
-
-            population_results=population_results,
-
-            hospital_results=hospital_results,
-
-            route_results=traffic_results
-
-        )
-
-        self.world_state.update_knowledge(
-
-            "priority_scores",
-
-            priority_results
-
-        )
-
-        # =====================================================
-        # RESOURCE ALLOCATION
-        # =====================================================
-
-        allocation_results = self.allocation_agent.run(
-
-            priority_results=priority_results,
-
-            hospital_results=hospital_results
-
-        )
-
-        # =====================================================
-        # COMMIT RESOURCE ALLOCATION
-        # =====================================================
-
-        for allocation in allocation_results.values():
-
-            if not allocation.success:
-                continue
-
-            # Reserve hospital beds
-
-            for hospitals in self.hospital_server.get_all_hospitals().values():
-
-                for hospital in hospitals:
-
-                    if hospital.name == allocation.assigned_hospital:
-
-                        self.hospital_server.reserve_beds(
-
-                            hospital.hospital_id,
-
-                            allocation.beds_allocated
-
-                        )
-
-                        break
-
-            # Deduct resources
-
-            self.resource_server.allocate(
-
-                rescue_teams=allocation.rescue_teams,
-
-                boats=allocation.boats,
-
-                ambulances=allocation.ambulances,
-
-                helicopters=allocation.helicopters,
-
-                food_packets=allocation.food_packets,
-
-                medical_kits=allocation.medical_kits
-
-            )
-
-            self.world_state.update_decision(
-
-                    "resource_allocations",
-
-                    allocation_results
-
-                )
-
-        # =====================================================
-        # DECISION
-        # =====================================================
-
-        mission_results = self.decision_agent.run(
-
-            priority_results=priority_results,
-
-            allocation_results=allocation_results
-
-        )
-
-        self.world_state.update_decision(
-
-            "missions",
-
-            mission_results
-
-        )
-
-        # =====================================================
-        # COMMUNICATION
-        # =====================================================
-
-        alert_results = self.communication_agent.run(
-
-            mission_results=mission_results
-
-        )
-
-        self.world_state.update_decision(
-
-            "public_alerts",
-
-            alert_results
-
-        )
-
-        # =====================================================
-        # STATISTICS
-        # =====================================================
-
-        self.world_state.update_statistics(
-
-            "areas_processed",
-
-            len(priority_results)
-
-        )
-
-        self.world_state.update_statistics(
-
-            "missions_created",
-
-            len(mission_results)
-
-        )
-
-        self.world_state.update_statistics(
-
-            "alerts_sent",
-
-            len(alert_results)
-
-        )
-
-        # =====================================================
-        # LOGS
-        # =====================================================
 
         self.world_state.add_log(
+            f"Starting disaster cycle for {disaster_area}"
+        )
 
-            f"Cycle {self.world_state.get_cycle() + 1} completed."
+        (
+            weather,
+            traffic,
+            population,
+            hospital,
+        ) = await asyncio.gather(
+
+            self._run_agent(
+                "Weather",
+                self.weather,
+                f"""
+What is the current weather in
+{disaster_area}?
+""",
+            ),
+
+            self._run_agent(
+                "Traffic",
+                self.traffic,
+                f"""
+Find the fastest rescue route
+from Bengaluru
+to {disaster_area}.
+""",
+            ),
+
+            self._run_agent(
+                "Population",
+                self.population,
+                f"""
+What is the population of
+{disaster_area}?
+""",
+            ),
+
+            self._run_agent(
+                "Hospital",
+                self.hospital,
+                f"""
+Find nearby hospitals
+in {disaster_area}.
+Return only nearest hospitals.
+""",
+            ),
 
         )
 
-        # =====================================================
-        # SYSTEM
-        # =====================================================
+        self.world_state.update_input(
+            "weather",
+            weather,
+        )
+
+        self.world_state.update_input(
+            "roads",
+            traffic,
+        )
+
+        self.world_state.update_input(
+            "areas",
+            population,
+        )
+
+        self.world_state.update_input(
+            "hospitals",
+            hospital,
+        )
+
+        priority = await asyncio.to_thread(
+
+            self.priority.run,
+
+            f"""
+Weather Information
+
+{weather}
+
+Traffic Information
+
+{traffic}
+
+Population Information
+
+{population}
+
+Hospital Information
+
+{hospital}
+
+Rank affected areas by priority.
+""",
+        )
+
+        self.world_state.update_knowledge(
+            "priority_scores",
+            priority,
+        )
+
+        allocation = await asyncio.to_thread(
+
+            self.allocation.run,
+
+            f"""
+Priority Report
+
+{priority}
+
+Allocate
+
+- Rescue Teams
+- Ambulances
+- Boats
+- Food
+- Medical Kits
+""",
+        )
+
+        self.world_state.update_decision(
+            "resource_allocations",
+            allocation,
+        )
+
+        decision = await asyncio.to_thread(
+
+            self.decision.run,
+
+            f"""
+Priority
+
+{priority}
+
+Allocation
+
+{allocation}
+
+Generate disaster response mission.
+""",
+        )
+
+        self.world_state.update_decision(
+            "missions",
+            decision,
+        )
+
+        communication = await asyncio.to_thread(
+
+            self.communication.run,
+
+            f"""
+Mission Plan
+
+{decision}
+
+Generate a public emergency alert.
+""",
+        )
+
+        self.world_state.update_decision(
+            "public_alerts",
+            communication,
+        )
 
         self.world_state.increment_cycle()
 
+        self.world_state.add_log(
+
+            f"Cycle "
+            f"{self.world_state.get_cycle()} "
+            f"completed successfully."
+
+        )
+
         self.world_state.update_system(
-
             "status",
+            "IDLE",
+        )
 
-            "IDLE"
+    def run(
+        self,
+        disaster_area: str,
+    ):
 
+        asyncio.run(
+            self.execute_cycle(
+                disaster_area,
+            )
         )

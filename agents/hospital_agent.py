@@ -1,64 +1,74 @@
 """
-agents/hospital_agent.py
-
-Hospital Agent
-
-Responsibilities
-----------------
-1. Fetch hospital information from HospitalServer.
-2. Analyze each hospital.
-3. Group HospitalStatus by area.
-4. Return the analysis results.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+SentinelAI - Hospital Wrapper Agent
 """
 
-from agents.base_agent import BaseAgent
-from utils.hospital_analyzer import HospitalAnalyzer
+from __future__ import annotations
+
+import asyncio
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from adk.agents.hospital_agent import root_agent
 
 
-class HospitalAgent(BaseAgent):
+class HospitalAgent:
 
-    def __init__(
+    def __init__(self):
+
+        self.session_service = InMemorySessionService()
+
+        self.runner = Runner(
+            app_name="SentinelAI",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
         self,
-        hospital_server,
-        logger=None
-    ):
+        query: str,
+    ) -> str:
 
-        super().__init__(logger)
+        session = await self.session_service.create_session(
+            app_name="SentinelAI",
+            user_id="hospital_user",
+        )
 
-        self.hospital_server = hospital_server
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(text=query),
+            ],
+        )
 
-    # ----------------------------------------------------------
+        final_response = ""
 
-    def run(self):
+        async for event in self.runner.run_async(
+            user_id="hospital_user",
+            session_id=session.id,
+            new_message=message,
+        ):
 
-        self.before_run()
+            if event.is_final_response():
 
-        hospitals = self.hospital_server.get_all_hospitals()
+                if (
+                    event.content
+                    and event.content.parts
+                ):
 
-        results = {}
+                    for part in event.content.parts:
 
-        for area_id, hospital_list in hospitals.items():
+                        if part.text:
+                            final_response += part.text
 
-            area_status = []
+        return final_response
 
-            for hospital in hospital_list:
+    def run(
+        self,
+        query: str,
+    ) -> str:
 
-                status = HospitalAnalyzer.analyze(hospital)
-
-                area_status.append(status)
-
-                self.log(
-                    f"{hospital.name} -> "
-                    f"{status.status} "
-                    f"({status.available_beds}/{status.total_beds} beds)"
-                )
-
-            results[area_id] = area_status
-
-        self.after_run()
-
-        return results
+        return asyncio.run(
+            self.run_async(query)
+        )

@@ -9,7 +9,8 @@ Visible To:
 - District Collector
 """
 
-import pandas as pd
+import json
+
 import streamlit as st
 
 
@@ -25,35 +26,48 @@ class CommanderDashboard:
 
         st.title("🛰️ Commander Dashboard")
 
-        knowledge = self.world_state.get_knowledge_state()
+        state = self.world_state.get_state()
 
-        decision = self.world_state.get_decision_state()
-
-        system = self.world_state.get_system_state()
-
-        statistics = self.world_state.get_statistics()
+        system = state["system"]
+        statistics = system["statistics"]
 
         self._system_overview(system, statistics)
 
-        self._priority_table(knowledge)
+        st.divider()
 
-        self._weather_table(knowledge)
+        col1, col2 = st.columns(2)
 
-        self._hospital_table(knowledge)
+        with col1:
 
-        self._route_table(knowledge)
+            self._weather(state)
+            self._traffic(state)
+            self._population(state)
 
-        self._resource_table(decision)
+        with col2:
 
-        self._mission_table(decision)
+            self._hospital(state)
+            self._priority(state)
+            self._allocation(state)
 
-        self._alert_table(decision)
+        st.divider()
 
-        self._logs()
+        self._mission(state)
+
+        st.divider()
+
+        self._alerts(state)
+
+        st.divider()
+
+        self._logs(system)
 
     # =========================================================
 
-    def _system_overview(self, system, statistics):
+    def _system_overview(
+        self,
+        system,
+        statistics,
+    ):
 
         st.subheader("System Overview")
 
@@ -61,309 +75,197 @@ class CommanderDashboard:
 
         c1.metric(
             "Cycle",
-            system["cycle"]
+            system["cycle"],
         )
 
         c2.metric(
             "Status",
-            system["status"]
+            system["status"],
         )
 
         c3.metric(
             "Areas",
-            statistics["areas_processed"]
+            statistics["areas_processed"],
         )
 
         c4.metric(
             "Missions",
-            statistics["missions_created"]
+            statistics["missions_created"],
         )
 
         c5.metric(
             "Alerts",
-            statistics["alerts_sent"]
+            statistics["alerts_sent"],
         )
 
-        st.divider()
+        if system["last_updated"]:
+
+            st.caption(
+                f"Last Updated : {system['last_updated']}"
+            )
 
     # =========================================================
 
-    def _priority_table(self, knowledge):
+    def _weather(
+        self,
+        state,
+    ):
 
-        st.subheader("Priority Assessment")
+        st.subheader("🌦 Weather Intelligence")
 
-        rows = []
+        weather = state["input"]["weather"]
 
-        for priority in knowledge["priority_scores"].values():
+        if weather:
 
-            rows.append({
-
-                "Area": priority.area_name,
-
-                "Priority": priority.priority_level,
-
-                "Score": priority.priority_score,
-
-                "Recommended Action": priority.recommended_action
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(weather)
 
         else:
 
-            st.info("No priority assessments available.")
+            st.info("No weather information available.")
 
     # =========================================================
 
-    def _weather_table(self, knowledge):
+    def _traffic(
+        self,
+        state,
+    ):
 
-        st.subheader("Weather Analysis")
+        st.subheader("🚦 Traffic Intelligence")
 
-        rows = []
+        roads = state["input"]["roads"]
 
-        for weather in knowledge["risk_scores"].values():
+        if roads:
 
-            rows.append({
-
-                "Area": weather.area_name,
-
-                "Risk Level": weather.risk_level,
-
-                "Risk Score": weather.risk_score,
-
-                "Rainfall": weather.rainfall,
-
-                "River Level": weather.river_level
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(roads)
 
         else:
 
-            st.info("No weather information.")
+            st.info("No traffic information available.")
 
     # =========================================================
 
-    def _hospital_table(self, knowledge):
+    def _population(
+        self,
+        state,
+    ):
 
-        st.subheader("Hospital Status")
+        st.subheader("👥 Population Intelligence")
 
-        rows = []
+        population = state["input"]["areas"]
 
-        for hospitals in knowledge["hospital_status"].values():
+        if population:
 
-            for hospital in hospitals:
-
-                rows.append({
-
-                    "Hospital": hospital.name,
-
-                    "Status": hospital.status,
-
-                    "Beds Available": hospital.available_beds,
-
-                    "Occupancy %": hospital.occupancy_percentage
-
-                })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(population)
 
         else:
 
-            st.info("No hospital information.")
+            st.info("No population information available.")
 
     # =========================================================
 
-    def _route_table(self, knowledge):
+    def _hospital(
+        self,
+        state,
+    ):
 
-        st.subheader("Road Status")
+        st.subheader("🏥 Hospital Intelligence")
 
-        rows = []
+        hospitals = state["input"]["hospitals"]
 
-        for routes in knowledge["route_status"].values():
+        if hospitals:
 
-            for route in routes:
-
-                rows.append({
-
-                    "Road": route.road_name,
-
-                    "Status": route.route_status,
-
-                    "Travel Time": route.travel_time
-
-                })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(hospitals)
 
         else:
 
-            st.info("No traffic information.")
+            st.info("No hospital information available.")
 
     # =========================================================
 
-    def _resource_table(self, decision):
+    def _priority(
+        self,
+        state,
+    ):
 
-        st.subheader("Resource Allocation")
+        st.subheader("🚨 Priority Analysis")
 
-        rows = []
+        priority = state["knowledge"]["priority_scores"]
 
-        for allocation in decision["resource_allocations"].values():
+        if priority:
 
-            rows.append({
-
-                "Area": allocation.area_name,
-
-                "Hospital": allocation.assigned_hospital,
-
-                "Beds": allocation.beds_allocated,
-
-                "Teams": allocation.rescue_teams,
-
-                "Boats": allocation.boats,
-
-                "Ambulances": allocation.ambulances,
-
-                "Helicopters": allocation.helicopters
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(priority)
 
         else:
 
-            st.info("No allocations available.")
+            st.info("Priority analysis not available.")
 
     # =========================================================
 
-    def _mission_table(self, decision):
+    def _allocation(
+        self,
+        state,
+    ):
 
-        st.subheader("Mission Control")
+        st.subheader("🚑 Resource Allocation")
 
-        rows = []
+        allocation = state["decision"]["resource_allocations"]
 
-        for mission in decision["missions"].values():
+        if allocation:
 
-            rows.append({
-
-                "Mission ID": mission.mission_id,
-
-                "Area": mission.area_name,
-
-                "Priority": mission.priority_level,
-
-                "Status": mission.status,
-
-                "Hospital": mission.assigned_hospital
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.markdown(allocation)
 
         else:
 
-            st.info("No missions available.")
+            st.info("No resource allocation available.")
 
     # =========================================================
 
-    def _alert_table(self, decision):
+    def _mission(
+        self,
+        state,
+    ):
 
-        st.subheader("Public Alerts")
+        st.subheader("🎯 Mission Plan")
 
-        alerts = decision["public_alerts"]
+        mission = state["decision"]["missions"]
 
-        if not alerts:
+        if mission:
 
-            st.success("No active alerts.")
+            st.markdown(mission)
 
-            return
+        else:
 
-        for alert in alerts.values():
-
-            st.warning(
-
-                f"""
-### {alert.title}
-
-**Area:** {alert.area_name}
-
-**Priority:** {alert.priority_level}
-
-**Message:** {alert.message}
-
-**Status:** {alert.status}
-"""
-            )
+            st.info("Mission plan not available.")
 
     # =========================================================
 
-    def _logs(self):
+    def _alerts(
+        self,
+        state,
+    ):
 
-        st.subheader("System Logs")
+        st.subheader("📢 Public Alerts")
 
-        logs = self.world_state.get_logs()
+        alerts = state["decision"]["public_alerts"]
+
+        if alerts:
+
+            st.warning(alerts)
+
+        else:
+
+            st.success("No public alerts.")
+
+    # =========================================================
+
+    def _logs(
+        self,
+        system,
+    ):
+
+        st.subheader("📜 System Logs")
+
+        logs = system["logs"]
 
         if not logs:
 
@@ -374,7 +276,26 @@ class CommanderDashboard:
         for log in reversed(logs):
 
             st.text(
-
                 f"[{log['time']}] {log['message']}"
+            )
 
+    # =========================================================
+
+    def _raw_state(
+        self,
+        state,
+    ):
+
+        with st.expander(
+            "View Raw World State",
+            expanded=False,
+        ):
+
+            st.json(
+                json.loads(
+                    json.dumps(
+                        state,
+                        default=str,
+                    )
+                )
             )

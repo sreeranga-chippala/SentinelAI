@@ -9,7 +9,8 @@ Visible To:
 - Emergency Coordinators
 """
 
-import pandas as pd
+import json
+
 import streamlit as st
 
 
@@ -25,189 +26,172 @@ class HospitalDashboard:
 
         st.title("🏥 Hospital Operations Dashboard")
 
-        knowledge = self.world_state.get_knowledge_state()
+        state = self.world_state.get_state()
 
-        decision = self.world_state.get_decision_state()
+        system = state["system"]
 
-        self._summary(knowledge)
+        self._summary(system)
 
-        self._hospital_table(knowledge)
+        st.divider()
 
-        self._incoming_patients(decision)
+        self._hospital_information(state)
 
-        self._assigned_missions(decision)
+        st.divider()
+
+        self._resource_allocations(state)
+
+        st.divider()
+
+        self._assigned_missions(state)
+
+        st.divider()
+
+        self._public_alerts(state)
+
+        st.divider()
+
+        self._logs(system)
 
     # =========================================================
 
-    def _summary(self, knowledge):
+    def _summary(self, system):
 
-        hospitals = []
+        st.subheader("Hospital Operations Summary")
 
-        available = 0
-        occupied = 0
-        icu = 0
+        statistics = system["statistics"]
 
-        for area in knowledge["hospital_status"].values():
-
-            hospitals.extend(area)
-
-        for hospital in hospitals:
-
-            available += hospital.available_beds
-
-            occupied += (
-                hospital.total_beds -
-                hospital.available_beds
-            )
-
-            icu += hospital.icu_beds
+        metrics = system.get("agent_metrics", {})
 
         c1, c2, c3, c4 = st.columns(4)
 
         c1.metric(
-            "Hospitals",
-            len(hospitals)
+            "Simulation Cycle",
+            system["cycle"],
         )
 
         c2.metric(
-            "Available Beds",
-            available
+            "Areas Processed",
+            statistics["areas_processed"],
         )
 
         c3.metric(
-            "Occupied Beds",
-            occupied
+            "Missions",
+            statistics["missions_created"],
         )
 
         c4.metric(
-            "ICU Beds",
-            icu
+            "Alerts",
+            statistics["alerts_sent"],
         )
 
-        st.divider()
+        if metrics:
 
-    # =========================================================
-
-    def _hospital_table(self, knowledge):
-
-        st.subheader("Hospital Status")
-
-        rows = []
-
-        for hospitals in knowledge["hospital_status"].values():
-
-            for hospital in hospitals:
-
-                rows.append({
-
-                    "Hospital": hospital.name,
-
-                    "Status": hospital.status,
-
-                    "Available Beds": hospital.available_beds,
-
-                    "Total Beds": hospital.total_beds,
-
-                    "ICU Beds": hospital.icu_beds,
-
-                    "Occupancy %": hospital.occupancy_percentage
-
-                })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
+            st.success("Hospital Agent Executed Successfully")
 
         else:
 
-            st.info("No hospital information available.")
+            st.info("Hospital Agent has not executed yet.")
 
     # =========================================================
 
-    def _incoming_patients(self, decision):
+    def _hospital_information(self, state):
 
-        st.subheader("Incoming Patients")
+        st.subheader("🏥 Nearby Hospitals")
 
-        rows = []
+        hospitals = state["input"]["hospitals"]
 
-        allocations = decision["resource_allocations"]
+        if not hospitals:
 
-        for allocation in allocations.values():
+            st.info("Hospital information not available.")
 
-            if allocation.assigned_hospital == "None":
+            return
 
-                continue
-
-            rows.append({
-
-                "Hospital": allocation.assigned_hospital,
-
-                "Area": allocation.area_name,
-
-                "Allocated Beds": allocation.beds_allocated
-
-            })
-
-        if rows:
-
-            st.dataframe(
-
-                pd.DataFrame(rows),
-
-                use_container_width=True,
-
-                hide_index=True
-
-            )
-
-        else:
-
-            st.success("No incoming patients.")
+        st.markdown(hospitals)
 
     # =========================================================
 
-    def _assigned_missions(self, decision):
+    def _resource_allocations(self, state):
 
-        st.subheader("Assigned Missions")
+        st.subheader("🚑 Resource Allocation")
 
-        rows = []
+        allocation = state["decision"]["resource_allocations"]
 
-        for mission in decision["missions"].values():
+        if not allocation:
 
-            rows.append({
+            st.info("No resource allocations available.")
 
-                "Mission ID": mission.mission_id,
+            return
 
-                "Area": mission.area_name,
+        st.markdown(allocation)
 
-                "Priority": mission.priority_level,
+    # =========================================================
 
-                "Hospital": mission.assigned_hospital,
+    def _assigned_missions(self, state):
 
-                "Status": mission.status
+        st.subheader("🎯 Assigned Missions")
 
-            })
+        missions = state["decision"]["missions"]
 
-        if rows:
+        if not missions:
 
-            st.dataframe(
+            st.info("No missions generated.")
 
-                pd.DataFrame(rows),
+            return
 
-                use_container_width=True,
+        st.markdown(missions)
 
-                hide_index=True
+    # =========================================================
 
+    def _public_alerts(self, state):
+
+        st.subheader("📢 Public Alerts")
+
+        alerts = state["decision"]["public_alerts"]
+
+        if not alerts:
+
+            st.success("No active public alerts.")
+
+            return
+
+        st.warning(alerts)
+
+    # =========================================================
+
+    def _logs(self, system):
+
+        st.subheader("📜 Hospital Logs")
+
+        logs = system["logs"]
+
+        if not logs:
+
+            st.info("No logs available.")
+
+            return
+
+        for log in reversed(logs):
+
+            with st.expander(log["time"]):
+
+                st.write(log["message"])
+
+    # =========================================================
+
+    def _raw_state(self):
+
+        with st.expander(
+            "View Raw Hospital State",
+            expanded=False,
+        ):
+
+            state = self.world_state.get_state()
+
+            st.json(
+                json.loads(
+                    json.dumps(
+                        state["input"]["hospitals"],
+                        default=str,
+                    )
+                )
             )
-
-        else:
-
-            st.info("No missions assigned.")

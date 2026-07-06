@@ -1,97 +1,81 @@
 """
-agents/allocation_agent.py
+SentinelAI - Allocation Wrapper Agent
 
-Allocation Agent
-
-Responsibilities
-----------------
-1. Receive priority assessments.
-2. Allocate resources for each area.
-3. Prevent double allocation.
-4. Return AllocationPlan objects.
-
-NOTE:
-This agent NEVER modifies WorldState.
-Coordinator commits the returned results.
+Wrapper around the Google ADK Allocation Agent.
 """
 
-from agents.base_agent import BaseAgent
+from __future__ import annotations
 
-from utils.allocation_engine import AllocationEngine
+import asyncio
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from adk.agents.allocation_agent import root_agent
 
 
-class AllocationAgent(BaseAgent):
+class AllocationAgent:
+    """
+    Wrapper for the ADK Allocation Agent.
+    """
 
-    def __init__(
+    def __init__(self) -> None:
+
+        self.session_service = InMemorySessionService()
+
+        self.runner = Runner(
+            app_name="SentinelAI",
+            agent=root_agent,
+            session_service=self.session_service,
+        )
+
+    async def run_async(
         self,
-        resource_server,
-        logger=None
-    ):
+        query: str,
+    ) -> str:
+        """
+        Execute the Allocation ADK agent.
+        """
 
-        super().__init__(logger)
+        session = await self.session_service.create_session(
+            app_name="SentinelAI",
+            user_id="allocation_user",
+        )
 
-        self.resource_server = resource_server
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(
+                    text=query,
+                )
+            ],
+        )
 
-    # ----------------------------------------------------------
+        final_response = ""
+
+        async for event in self.runner.run_async(
+            user_id="allocation_user",
+            session_id=session.id,
+            new_message=message,
+        ):
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if getattr(part, "text", None):
+                        final_response += part.text
+
+        return final_response.strip()
 
     def run(
         self,
-        priority_results,
-        hospital_results
-    ):
+        query: str,
+    ) -> str:
+        """
+        Synchronous wrapper.
+        """
 
-        self.before_run()
-
-        resources = self.resource_server.get_resources()
-
-        allocation_results = {}
-
-        # ---------------------------------------------
-        # Highest priority first
-        # ---------------------------------------------
-
-        ordered_priorities = sorted(
-
-            priority_results.values(),
-
-            key=lambda priority: priority.priority_score,
-
-            reverse=True
-
+        return asyncio.run(
+            self.run_async(
+                query,
+            )
         )
-
-        # ---------------------------------------------
-
-        for priority in ordered_priorities:
-
-            hospitals = hospital_results.get(
-
-                priority.area_id,
-
-                []
-
-            )
-
-            plan = AllocationEngine.allocate(
-
-                priority=priority,
-
-                hospitals=hospitals,
-
-                resources=resources
-
-            )
-
-            allocation_results[priority.area_id] = plan
-
-            self.log(
-
-                f"{priority.area_name} -> "
-
-                f"{plan.message}"
-
-            )
-
-        self.after_run()
-
-        return allocation_results

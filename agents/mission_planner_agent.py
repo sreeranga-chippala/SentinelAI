@@ -1,9 +1,10 @@
 """
-SentinelAI Population Wrapper Agent
+SentinelAI Mission Planner Wrapper Agent
 
 Optimized Wrapper
 - Reuses ADK Runner
 - Reuses ADK Session
+- Async-only (no asyncio.run())
 """
 
 from __future__ import annotations
@@ -12,16 +13,16 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from adk.agents.population_agent import root_agent
+from adk.agents.mission_planner_agent import root_agent
 
 
-class PopulationAgent:
+class MissionPlannerAgent:
 
     def __init__(self):
 
         self.app_name = "SentinelAI"
 
-        self.user_id = "population_user"
+        self.user_id = "planner_user"
 
         self.session_service = InMemorySessionService()
 
@@ -46,7 +47,7 @@ class PopulationAgent:
 
     async def run_async(
         self,
-        location: str,
+        query: str,
     ) -> str:
 
         session = await self._get_session()
@@ -55,7 +56,7 @@ class PopulationAgent:
             role="user",
             parts=[
                 types.Part(
-                    text=f"What is the population of {location}?"
+                    text=query,
                 )
             ],
         )
@@ -68,10 +69,10 @@ class PopulationAgent:
             new_message=message,
         ):
 
-            if not event.content:
+            if event.content is None:
                 continue
 
-            if not event.content.parts:
+            if event.content.parts is None:
                 continue
 
             for part in event.content.parts:

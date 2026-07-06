@@ -10,7 +10,6 @@ Visible To:
 """
 
 import json
-
 import streamlit as st
 
 
@@ -46,12 +45,11 @@ class CommanderDashboard:
         with col2:
 
             self._hospital(state)
-            self._priority(state)
-            self._allocation(state)
+            self._agent_metrics(system)
 
         st.divider()
 
-        self._mission(state)
+        self._mission_plan(state)
 
         st.divider()
 
@@ -61,6 +59,10 @@ class CommanderDashboard:
 
         self._logs(system)
 
+        st.divider()
+
+        self._raw_state(state)
+
     # =========================================================
 
     def _system_overview(
@@ -69,34 +71,15 @@ class CommanderDashboard:
         statistics,
     ):
 
-        st.subheader("System Overview")
+        st.subheader("🚀 System Overview")
 
         c1, c2, c3, c4, c5 = st.columns(5)
 
-        c1.metric(
-            "Cycle",
-            system["cycle"],
-        )
-
-        c2.metric(
-            "Status",
-            system["status"],
-        )
-
-        c3.metric(
-            "Areas",
-            statistics["areas_processed"],
-        )
-
-        c4.metric(
-            "Missions",
-            statistics["missions_created"],
-        )
-
-        c5.metric(
-            "Alerts",
-            statistics["alerts_sent"],
-        )
+        c1.metric("Cycle", system["cycle"])
+        c2.metric("Status", system["status"])
+        c3.metric("Areas", statistics["areas_processed"])
+        c4.metric("Missions", statistics["missions_created"])
+        c5.metric("Alerts", statistics["alerts_sent"])
 
         if system["last_updated"]:
 
@@ -106,10 +89,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _weather(
-        self,
-        state,
-    ):
+    def _weather(self, state):
 
         st.subheader("🌦 Weather Intelligence")
 
@@ -125,18 +105,15 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _traffic(
-        self,
-        state,
-    ):
+    def _traffic(self, state):
 
         st.subheader("🚦 Traffic Intelligence")
 
-        roads = state["input"]["roads"]
+        traffic = state["input"]["roads"]
 
-        if roads:
+        if traffic:
 
-            st.markdown(roads)
+            st.markdown(traffic)
 
         else:
 
@@ -144,10 +121,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _population(
-        self,
-        state,
-    ):
+    def _population(self, state):
 
         st.subheader("👥 Population Intelligence")
 
@@ -163,10 +137,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _hospital(
-        self,
-        state,
-    ):
+    def _hospital(self, state):
 
         st.subheader("🏥 Hospital Intelligence")
 
@@ -182,52 +153,27 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _priority(
-        self,
-        state,
-    ):
+    def _agent_metrics(self, system):
 
-        st.subheader("🚨 Priority Analysis")
+        st.subheader("⚙️ Agent Metrics")
 
-        priority = state["knowledge"]["priority_scores"]
+        metrics = system["agent_metrics"]
 
-        if priority:
+        if not metrics:
 
-            st.markdown(priority)
+            st.info("No metrics available.")
 
-        else:
+            return
 
-            st.info("Priority analysis not available.")
+        st.json(metrics)
 
     # =========================================================
 
-    def _allocation(
-        self,
-        state,
-    ):
+    def _mission_plan(self, state):
 
-        st.subheader("🚑 Resource Allocation")
+        st.subheader("🧠 Mission Planner Report")
 
-        allocation = state["decision"]["resource_allocations"]
-
-        if allocation:
-
-            st.markdown(allocation)
-
-        else:
-
-            st.info("No resource allocation available.")
-
-    # =========================================================
-
-    def _mission(
-        self,
-        state,
-    ):
-
-        st.subheader("🎯 Mission Plan")
-
-        mission = state["decision"]["missions"]
+        mission = state["decision"]["mission_plan"]
 
         if mission:
 
@@ -239,10 +185,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _alerts(
-        self,
-        state,
-    ):
+    def _alerts(self, state):
 
         st.subheader("📢 Public Alerts")
 
@@ -258,10 +201,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _logs(
-        self,
-        system,
-    ):
+    def _logs(self, system):
 
         st.subheader("📜 System Logs")
 
@@ -281,10 +221,7 @@ class CommanderDashboard:
 
     # =========================================================
 
-    def _raw_state(
-        self,
-        state,
-    ):
+    def _raw_state(self, state):
 
         with st.expander(
             "View Raw World State",
@@ -292,10 +229,14 @@ class CommanderDashboard:
         ):
 
             st.json(
+
                 json.loads(
+
                     json.dumps(
                         state,
                         default=str,
                     )
+
                 )
+
             )

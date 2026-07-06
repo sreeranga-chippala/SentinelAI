@@ -16,10 +16,13 @@ from datetime import datetime
 from threading import Lock
 import json
 
+
 class WorldState:
 
     def __init__(self):
+
         self._lock = Lock()
+
         self.reset()
 
     # ==========================================================
@@ -31,59 +34,62 @@ class WorldState:
         self.state = {
 
             # --------------------------------------------------
-            # INPUT LAYER
+            # INPUT
             # --------------------------------------------------
 
             "input": {
 
-                "areas": {},
+                "areas": "",
 
-                "weather": {},
+                "weather": "",
 
-                "roads": {},
+                "roads": "",
 
-                "hospitals": {},
+                "hospitals": "",
 
-                "resources": {}
-
-            },
-
-            # --------------------------------------------------
-            # KNOWLEDGE LAYER
-            # --------------------------------------------------
-
-            "knowledge": {
-
-                "risk_scores": {},
-
-                "population_status": {},
-
-                "route_status": {},
-
-                "hospital_status": {},
-
-                "priority_scores": {}
+                "resources": ""
 
             },
 
             # --------------------------------------------------
-            # DECISION LAYER
+            # KNOWLEDGE
+            # --------------------------------------------------
+
+           "knowledge": {
+
+                "risk_scores": "",
+
+                "population_status": "",
+
+                "route_status": "",
+
+                "hospital_status": "",
+
+                "priority_scores": ""
+
+            },
+
+            # --------------------------------------------------
+            # DECISION
             # --------------------------------------------------
 
             "decision": {
 
-                "resource_allocations": {},
+                "mission_plan": "",
 
-                "missions": {},
-
-                "public_alerts": {}
+                "public_alerts": ""
 
             },
 
             # --------------------------------------------------
+            # HISTORY
+            # --------------------------------------------------
+
+            "history": [],
+
+            # --------------------------------------------------
             # SYSTEM
             # --------------------------------------------------
-            "history": [],
 
             "system": {
 
@@ -103,7 +109,7 @@ class WorldState:
 
                     "missions_created": 0,
 
-                    "alerts_sent": 0
+                    "alerts_sent": 0,
 
                 }
 
@@ -118,6 +124,7 @@ class WorldState:
     def update_input(self, key, value):
 
         if key not in self.state["input"]:
+
             raise KeyError(f"Invalid input key: {key}")
 
         with self._lock:
@@ -125,8 +132,6 @@ class WorldState:
             self.state["input"][key] = value
 
             self._touch()
-
-        self._touch()
 
     def get_input_state(self):
 
@@ -139,11 +144,14 @@ class WorldState:
     def update_knowledge(self, key, value):
 
         if key not in self.state["knowledge"]:
+
             raise KeyError(f"Invalid knowledge key: {key}")
 
-        self.state["knowledge"][key] = value
+        with self._lock:
 
-        self._touch()
+            self.state["knowledge"][key] = value
+
+            self._touch()
 
     def get_knowledge_state(self):
 
@@ -151,10 +159,13 @@ class WorldState:
 
     def clear_knowledge(self):
 
-        for key in self.state["knowledge"]:
-            self.state["knowledge"][key] = {}
+        with self._lock:
 
-        self._touch()
+            for key in self.state["knowledge"]:
+
+                self.state["knowledge"][key] = ""
+
+            self._touch()
 
     # ==========================================================
     # DECISION
@@ -163,11 +174,14 @@ class WorldState:
     def update_decision(self, key, value):
 
         if key not in self.state["decision"]:
+
             raise KeyError(f"Invalid decision key: {key}")
 
-        self.state["decision"][key] = value
+        with self._lock:
 
-        self._touch()
+            self.state["decision"][key] = value
+
+            self._touch()
 
     def get_decision_state(self):
 
@@ -175,10 +189,13 @@ class WorldState:
 
     def clear_decision(self):
 
-        for key in self.state["decision"]:
-            self.state["decision"][key] = {}
+        with self._lock:
 
-        self._touch()
+            for key in self.state["decision"]:
+
+                self.state["decision"][key] = ""
+
+            self._touch()
 
     # ==========================================================
     # SYSTEM
@@ -186,9 +203,11 @@ class WorldState:
 
     def increment_cycle(self):
 
-        self.state["system"]["cycle"] += 1
+        with self._lock:
 
-        self._touch()
+            self.state["system"]["cycle"] += 1
+
+            self._touch()
 
     def get_cycle(self):
 
@@ -205,11 +224,14 @@ class WorldState:
     def update_system(self, key, value):
 
         if key not in self.state["system"]:
+
             raise KeyError(f"Invalid system key: {key}")
 
-        self.state["system"][key] = value
+        with self._lock:
 
-        self._touch()
+            self.state["system"][key] = value
+
+            self._touch()
 
     # ==========================================================
     # STATISTICS
@@ -218,20 +240,26 @@ class WorldState:
     def update_statistics(self, key, value):
 
         if key not in self.state["system"]["statistics"]:
+
             raise KeyError(f"Invalid statistics key: {key}")
 
-        self.state["system"]["statistics"][key] = value
+        with self._lock:
 
-        self._touch()
+            self.state["system"]["statistics"][key] = value
+
+            self._touch()
 
     def increment_statistic(self, key, amount=1):
 
         if key not in self.state["system"]["statistics"]:
+
             raise KeyError(f"Invalid statistics key: {key}")
 
-        self.state["system"]["statistics"][key] += amount
+        with self._lock:
 
-        self._touch()
+            self.state["system"]["statistics"][key] += amount
+
+            self._touch()
 
     def get_statistics(self):
 
@@ -245,13 +273,19 @@ class WorldState:
 
         with self._lock:
 
-            self.state["system"]["logs"].append({
+            self.state["system"]["logs"].append(
 
-                "time": datetime.now().isoformat(),
+                {
 
-                "message": message
+                    "time": datetime.now().isoformat(),
 
-            })
+                    "message": message,
+
+                }
+
+            )
+
+            self._touch()
 
     def get_logs(self):
 
@@ -265,21 +299,124 @@ class WorldState:
 
             self._touch()
 
-    def update_agent_metric(self, agent, execution_time, success, ):
+    # ==========================================================
+    # AGENT METRICS
+    # ==========================================================
 
-            with self._lock:
+    def update_agent_metric(
 
-                self.state["system"]["agent_metrics"][agent] = {
+        self,
 
-                    "execution_time": execution_time,
+        agent,
 
-                    "success": success,
+        execution_time,
 
-                    "updated": datetime.now().isoformat(),
+        success,
+
+    ):
+
+        with self._lock:
+
+            self.state["system"]["agent_metrics"][agent] = {
+
+                "execution_time": execution_time,
+
+                "success": success,
+
+                "updated": datetime.now().isoformat(),
+
+            }
+
+            self._touch()
+
+    def get_agent_metrics(self):
+
+        return deepcopy(
+            self.state["system"]["agent_metrics"]
+        )
+
+    # ==========================================================
+    # SNAPSHOTS
+    # ==========================================================
+
+    def save_cycle_snapshot(self):
+
+        with self._lock:
+
+            self.state["history"].append(
+
+                {
+
+                    "cycle": self.get_cycle(),
+
+                    "timestamp": datetime.now().isoformat(),
+
+                    "input": deepcopy(self.state["input"]),
+
+                    "knowledge": deepcopy(self.state["knowledge"]),
+
+                    "decision": deepcopy(self.state["decision"]),
+
+                    "system": deepcopy(self.state["system"]),
 
                 }
 
-                self._touch()
+            )
+
+            self._touch()
+
+    # ==========================================================
+    # EXPORT / IMPORT
+    # ==========================================================
+
+    def export_json(
+
+        self,
+
+        filename="world_state.json",
+
+    ):
+
+        with self._lock:
+
+            with open(
+
+                filename,
+
+                "w",
+
+                encoding="utf-8",
+
+            ) as f:
+
+                json.dump(
+                    self.state,
+                    f,
+                    indent=4,
+                    default=str,
+                )
+
+    def load_json(
+
+        self,
+
+        filename,
+
+    ):
+
+        with self._lock:
+
+            with open(
+
+                filename,
+
+                "r",
+
+                encoding="utf-8",
+
+            ) as f:
+
+                self.state = json.load(f)
 
     # ==========================================================
     # COMPLETE STATE
@@ -295,53 +432,4 @@ class WorldState:
 
     def _touch(self):
 
-        self.state["system"]["last_updated"] = (datetime.now().isoformat())
-
-    def save_cycle_snapshot(self):
-
-        with self._lock:
-
-            snapshot = {
-
-                "cycle": self.get_cycle(),
-
-                "timestamp": datetime.now().isoformat(),
-
-                "input": deepcopy(self.state["input"]),
-
-                "knowledge": deepcopy(self.state["knowledge"]),
-
-                "decision": deepcopy(self.state["decision"]),
-
-                "system": deepcopy(self.state["system"]),
-
-            }
-
-            self.state["history"].append(snapshot)
-            self._touch()
-
-    def export_json(
-        self,
-        filename="world_state.json",
-    ):
-
-        with self._lock:
-
-            with open(
-                filename,
-                "w",
-                encoding="utf-8",
-            ) as f:
-
-                json.dump(
-                    self.state,
-                    f,
-                    indent=4,
-                )
-        def load_json(self, filename,):
-
-            with self._lock:
-
-                with open(filename, "r",encoding="utf-8",) as f:
-
-                    self.state = json.load(f)
+        self.state["system"]["last_updated"] = datetime.now().isoformat()

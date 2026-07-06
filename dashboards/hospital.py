@@ -38,11 +38,7 @@ class HospitalDashboard:
 
         st.divider()
 
-        self._resource_allocations(state)
-
-        st.divider()
-
-        self._assigned_missions(state)
+        self._mission_plan(state)
 
         st.divider()
 
@@ -51,6 +47,10 @@ class HospitalDashboard:
         st.divider()
 
         self._logs(system)
+
+        st.divider()
+
+        self._raw_state()
 
     # =========================================================
 
@@ -100,45 +100,29 @@ class HospitalDashboard:
 
         hospitals = state["input"]["hospitals"]
 
-        if not hospitals:
+        if hospitals:
+
+            st.markdown(hospitals)
+
+        else:
 
             st.info("Hospital information not available.")
 
-            return
-
-        st.markdown(hospitals)
-
     # =========================================================
 
-    def _resource_allocations(self, state):
+    def _mission_plan(self, state):
 
-        st.subheader("🚑 Resource Allocation")
+        st.subheader("🚑 Mission Planner Report")
 
-        allocation = state["decision"]["resource_allocations"]
+        mission = state["decision"]["mission_plan"]
 
-        if not allocation:
+        if mission:
 
-            st.info("No resource allocations available.")
+            st.markdown(mission)
 
-            return
+        else:
 
-        st.markdown(allocation)
-
-    # =========================================================
-
-    def _assigned_missions(self, state):
-
-        st.subheader("🎯 Assigned Missions")
-
-        missions = state["decision"]["missions"]
-
-        if not missions:
-
-            st.info("No missions generated.")
-
-            return
-
-        st.markdown(missions)
+            st.info("Mission plan not available.")
 
     # =========================================================
 
@@ -148,13 +132,13 @@ class HospitalDashboard:
 
         alerts = state["decision"]["public_alerts"]
 
-        if not alerts:
+        if alerts:
+
+            st.warning(alerts)
+
+        else:
 
             st.success("No active public alerts.")
-
-            return
-
-        st.warning(alerts)
 
     # =========================================================
 
@@ -188,10 +172,14 @@ class HospitalDashboard:
             state = self.world_state.get_state()
 
             st.json(
+
                 json.loads(
+
                     json.dumps(
-                        state["input"]["hospitals"],
+                        state,
                         default=str,
                     )
+
                 )
+
             )

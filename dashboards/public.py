@@ -41,7 +41,7 @@ class PublicDashboard:
 
             self._hospitals(state)
 
-            self._missions(state)
+            self._mission_plan(state)
 
         st.divider()
 
@@ -121,19 +121,19 @@ class PublicDashboard:
 
     # =========================================================
 
-    def _missions(self, state):
+    def _mission_plan(self, state):
 
         st.subheader("🚑 Rescue Mission Updates")
 
-        missions = state["decision"]["missions"]
+        mission = state["decision"]["mission_plan"]
 
-        if missions:
+        if mission:
 
-            st.markdown(missions)
+            st.markdown(mission)
 
         else:
 
-            st.info("No rescue missions announced.")
+            st.info("No rescue mission updates available.")
 
     # =========================================================
 
@@ -189,13 +189,9 @@ class PublicDashboard:
         )
 
         if st.button(
-
             "🚨 SEND SOS REQUEST",
-
             use_container_width=True,
-
             type="primary",
-
         ):
 
             st.success(
@@ -203,6 +199,7 @@ class PublicDashboard:
 SOS request has been generated.
 
 Emergency Control Center has been notified.
+
 Please keep your phone reachable.
 """
             )

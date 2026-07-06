@@ -1,7 +1,7 @@
 """
-SentinelAI - Priority Wrapper Agent
+SentinelAI Planning Wrapper Agent
 
-Wrapper around the Google ADK Priority Agent.
+Wrapper around the Google ADK Planning Agent.
 """
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from adk.agents.priority_agent import root_agent
+from adk.agents.planning_agent import root_agent
 
 
-class PriorityAgent:
+class PlanningAgent:
     """
-    Wrapper for the ADK Priority Agent.
+    Wrapper for the ADK Planning Agent.
     """
 
     def __init__(self) -> None:
@@ -37,7 +37,7 @@ class PriorityAgent:
 
         session = await self.session_service.create_session(
             app_name="SentinelAI",
-            user_id="priority_user",
+            user_id="planning_user",
         )
 
         message = types.Content(
@@ -50,13 +50,17 @@ class PriorityAgent:
         final_response = ""
 
         async for event in self.runner.run_async(
-            user_id="priority_user",
+            user_id="planning_user",
             session_id=session.id,
             new_message=message,
         ):
+
             if event.content and event.content.parts:
+
                 for part in event.content.parts:
+
                     if getattr(part, "text", None):
+
                         final_response += part.text
 
         return final_response.strip()

@@ -50,11 +50,7 @@ class RescueDashboard:
 
         st.divider()
 
-        self._resource_allocations(state)
-
-        st.divider()
-
-        self._missions(state)
+        self._mission_plan(state)
 
         st.divider()
 
@@ -160,35 +156,19 @@ class RescueDashboard:
 
     # =========================================================
 
-    def _resource_allocations(self, state):
+    def _mission_plan(self, state):
 
-        st.subheader("🚒 Resource Allocation")
+        st.subheader("🎯 Rescue Mission Plan")
 
-        allocation = state["decision"]["resource_allocations"]
+        mission = state["decision"]["mission_plan"]
 
-        if allocation:
+        if mission:
 
-            st.markdown(allocation)
-
-        else:
-
-            st.info("No resource allocation available.")
-
-    # =========================================================
-
-    def _missions(self, state):
-
-        st.subheader("🎯 Rescue Missions")
-
-        missions = state["decision"]["missions"]
-
-        if missions:
-
-            st.markdown(missions)
+            st.markdown(mission)
 
         else:
 
-            st.info("No rescue missions available.")
+            st.info("Mission plan not available.")
 
     # =========================================================
 

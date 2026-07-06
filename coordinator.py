@@ -8,8 +8,6 @@ Wrapper Agents
 ADK
     ↓
 MCP
-
-Production Version
 """
 
 from __future__ import annotations
@@ -21,11 +19,7 @@ from agents.weather_agent import WeatherAgent
 from agents.traffic_agent import TrafficAgent
 from agents.population_agent import PopulationAgent
 from agents.hospital_agent import HospitalAgent
-
-from agents.priority_agent import PriorityAgent
-from agents.allocation_agent import AllocationAgent
-from agents.decision_agent import DecisionAgent
-from agents.communication_agent import CommunicationAgent
+from agents.mission_planner_agent import MissionPlannerAgent
 
 
 class Coordinator:
@@ -39,32 +33,28 @@ class Coordinator:
         self.population = PopulationAgent()
         self.hospital = HospitalAgent()
 
-        self.priority = PriorityAgent()
-        self.allocation = AllocationAgent()
-        self.decision = DecisionAgent()
-        self.communication = CommunicationAgent()
+        self.mission_planner = MissionPlannerAgent()
+
+    # =========================================================
 
     async def _run_agent(
         self,
         name: str,
-        agent,
-        query: str,
+        coro,
     ):
 
         start = time.perf_counter()
 
         try:
 
-            result = await asyncio.to_thread(
-                agent.run,
-                query,
-            )
+            result = await coro
 
             success = True
 
         except Exception as exc:
 
             result = f"ERROR: {exc}"
+
             success = False
 
         elapsed = round(
@@ -78,7 +68,15 @@ class Coordinator:
             f"in {elapsed}s"
         )
 
+        self.world_state.update_agent_metric(
+            name,
+            elapsed,
+            success,
+        )
+
         return result
+
+    # =========================================================
 
     async def execute_cycle(
         self,
@@ -94,52 +92,47 @@ class Coordinator:
             f"Starting disaster cycle for {disaster_area}"
         )
 
-        (
-            weather,
-            traffic,
-            population,
-            hospital,
-        ) = await asyncio.gather(
+        # =====================================================
+        # Run all MCP Agents in parallel
+        # =====================================================
 
-            self._run_agent(
-                "Weather",
-                self.weather,
-                f"""
-What is the current weather in
-{disaster_area}?
-""",
-            ),
-
-            self._run_agent(
-                "Traffic",
-                self.traffic,
-                f"""
-Find the fastest rescue route
-from Bengaluru
-to {disaster_area}.
-""",
-            ),
-
-            self._run_agent(
-                "Population",
-                self.population,
-                f"""
-What is the population of
-{disaster_area}?
-""",
-            ),
-
-            self._run_agent(
-                "Hospital",
-                self.hospital,
-                f"""
-Find nearby hospitals
-in {disaster_area}.
-Return only nearest hospitals.
-""",
-            ),
-
+        weather_task = self._run_agent(
+            "Weather",
+            self.weather.run_async(disaster_area),
         )
+
+        traffic_task = self._run_agent(
+            "Traffic",
+            self.traffic.run_async(
+                "Bengaluru",
+                disaster_area,
+            ),
+        )
+
+        population_task = self._run_agent(
+            "Population",
+            self.population.run_async(
+                disaster_area,
+            ),
+        )
+
+        hospital_task = self._run_agent(
+            "Hospital",
+            self.hospital.run_async(
+                disaster_area,
+            ),
+        )
+
+        weather, traffic, population, hospital = await asyncio.gather(
+            weather_task,
+            traffic_task,
+            population_task,
+            hospital_task,
+        )
+
+        # =====================================================
+        # Store MCP Results
+        # =====================================================
 
         self.world_state.update_input(
             "weather",
@@ -161,114 +154,100 @@ Return only nearest hospitals.
             hospital,
         )
 
-        priority = await asyncio.to_thread(
+        # =====================================================
+        # Mission Planner
+        # =====================================================
 
-            self.priority.run,
-
-            f"""
-Weather Information
+        mission_plan = await self._run_agent(
+            "Mission Planner",
+            self.mission_planner.run_async(
+                f"""
+Weather
 
 {weather}
 
-Traffic Information
+Traffic
 
 {traffic}
 
-Population Information
+Population
 
 {population}
 
-Hospital Information
+Hospitals
 
 {hospital}
 
-Rank affected areas by priority.
-""",
+Generate ONE complete disaster response report.
+
+Include:
+
+# Priority Assessment
+
+# Resource Allocation
+
+# Rescue Missions
+
+# Public Alerts
+
+Return Markdown only.
+"""
+            ),
         )
+
+        # =====================================================
+        # Save Planner Output
+        # =====================================================
 
         self.world_state.update_knowledge(
             "priority_scores",
-            priority,
-        )
-
-        allocation = await asyncio.to_thread(
-
-            self.allocation.run,
-
-            f"""
-Priority Report
-
-{priority}
-
-Allocate
-
-- Rescue Teams
-- Ambulances
-- Boats
-- Food
-- Medical Kits
-""",
+            mission_plan,
         )
 
         self.world_state.update_decision(
-            "resource_allocations",
-            allocation,
-        )
-
-        decision = await asyncio.to_thread(
-
-            self.decision.run,
-
-            f"""
-Priority
-
-{priority}
-
-Allocation
-
-{allocation}
-
-Generate disaster response mission.
-""",
-        )
-
-        self.world_state.update_decision(
-            "missions",
-            decision,
-        )
-
-        communication = await asyncio.to_thread(
-
-            self.communication.run,
-
-            f"""
-Mission Plan
-
-{decision}
-
-Generate a public emergency alert.
-""",
+            "mission_plan",
+            mission_plan,
         )
 
         self.world_state.update_decision(
             "public_alerts",
-            communication,
+            mission_plan,
         )
+
+        # =====================================================
+        # Statistics
+        # =====================================================
+
+        self.world_state.increment_statistic(
+            "areas_processed",
+        )
+
+        self.world_state.increment_statistic(
+            "missions_created",
+        )
+
+        self.world_state.increment_statistic(
+            "alerts_sent",
+        )
+
+        # =====================================================
+        # Finish
+        # =====================================================
 
         self.world_state.increment_cycle()
 
+        self.world_state.save_cycle_snapshot()
+
         self.world_state.add_log(
-
-            f"Cycle "
-            f"{self.world_state.get_cycle()} "
-            f"completed successfully."
-
+            f"Cycle {self.world_state.get_cycle()} completed successfully."
         )
 
         self.world_state.update_system(
             "status",
             "IDLE",
         )
+
+    # =========================================================
 
     def run(
         self,

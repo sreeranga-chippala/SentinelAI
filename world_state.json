@@ -1,0 +1,33 @@
+{
+    "input": {
+        "areas": "",
+        "weather": "",
+        "roads": "",
+        "hospitals": "",
+        "resources": ""
+    },
+    "knowledge": {
+        "risk_scores": "",
+        "population_status": "",
+        "route_status": "",
+        "hospital_status": "",
+        "priority_scores": ""
+    },
+    "decision": {
+        "mission_plan": "",
+        "public_alerts": ""
+    },
+    "history": [],
+    "system": {
+        "cycle": 0,
+        "status": "IDLE",
+        "last_updated": null,
+        "logs": [],
+        "agent_metrics": {},
+        "statistics": {
+            "areas_processed": 0,
+            "missions_created": 0,
+            "alerts_sent": 0
+        }
+    }
+}

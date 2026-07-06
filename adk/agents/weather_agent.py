@@ -1,9 +1,7 @@
 """
-SentinelAI
-Weather ADK Agent
+SentinelAI Weather ADK Agent
 
-This agent connects to the Weather MCP Server using the
-official Google ADK McpToolset.
+Uses the Weather MCP Server through Google ADK.
 """
 
 from __future__ import annotations
@@ -16,6 +14,7 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import (
     StdioConnectionParams,
 )
+from google.genai import types
 
 from mcp import StdioServerParameters
 
@@ -31,29 +30,65 @@ SERVER_PATH = (
 
 
 root_agent = LlmAgent(
-    model="gemini-2.5-flash",
+
     name="weather_agent",
+
+    model="gemini-2.5-flash-lite",
+
     instruction="""
 You are SentinelAI's Weather Intelligence Agent.
 
-Always use the Weather MCP tools.
+Always use the Weather MCP tool.
 
-Never hallucinate weather information.
+Never answer from your own knowledge.
 
-Return structured and concise weather observations.
+Return only concise weather observations.
 """,
-    tools=[
-        McpToolset(
-            connection_params=StdioConnectionParams(
-                server_params=StdioServerParameters(
-    command=sys.executable,
-    args=[
-        "-m",
-        "mcp_servers.weather.server",
-    ],
-),
-                timeout=30,
+
+    generate_content_config=types.GenerateContentConfig(
+
+        temperature=0,
+
+        http_options=types.HttpOptions(
+
+            retry_options=types.HttpRetryOptions(
+
+                initial_delay=2,
+
+                attempts=5,
+
             ),
+
         ),
+
+    ),
+
+    tools=[
+
+        McpToolset(
+
+            connection_params=StdioConnectionParams(
+
+                server_params=StdioServerParameters(
+
+                    command=sys.executable,
+
+                    args=[
+
+                        "-m",
+
+                        "mcp_servers.weather.server",
+
+                    ],
+
+                ),
+
+                timeout=30,
+
+            ),
+
+        ),
+
     ],
+
 )

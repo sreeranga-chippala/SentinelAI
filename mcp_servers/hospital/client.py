@@ -1,11 +1,12 @@
 """
 SentinelAI - Hospital MCP Client
+
+Provides a singleton MCP connection for the Hospital Server.
 """
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from google.adk.tools.mcp_tool.mcp_session_manager import (
     StdioConnectionParams,
@@ -14,25 +15,35 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 from mcp import StdioServerParameters
 
 
+_connection: StdioConnectionParams | None = None
+
+
 def get_hospital_connection() -> StdioConnectionParams:
     """
-    MCP connection parameters for Hospital Server.
+    Returns a singleton MCP connection.
     """
 
-    server_file = (
-        Path(__file__)
-        .resolve()
-        .parent
-        / "server.py"
-    )
+    global _connection
 
-    return StdioConnectionParams(
-        server_params=StdioServerParameters(
-            command=sys.executable,
-            args=[
-                "-m",
-                "mcp_servers.hospital.server",
-            ],
-        ),
-        timeout=30,
-    )
+    if _connection is None:
+
+        _connection = StdioConnectionParams(
+
+            server_params=StdioServerParameters(
+
+                command=sys.executable,
+
+                args=[
+                    "-m",
+                    "mcp_servers.hospital.server",
+                ],
+
+            ),
+
+            # keep the connection alive longer
+
+            timeout=120,
+
+        )
+
+    return _connection

@@ -60,6 +60,12 @@ class TrafficAgent:
 Find the fastest rescue route
 from {origin}
 to {destination}.
+
+Return:
+- Best Route
+- Distance
+- Estimated Time
+- Road Status
 """
                 )
             ],
@@ -86,3 +92,18 @@ to {destination}.
                     response += part.text
 
         return response.strip()
+
+    def run(
+        self,
+        origin: str,
+        destination: str,
+    ) -> str:
+
+        import asyncio
+
+        return asyncio.run(
+            self.run_async(
+                origin,
+                destination,
+            )
+        )

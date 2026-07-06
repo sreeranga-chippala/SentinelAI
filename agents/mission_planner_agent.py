@@ -1,13 +1,22 @@
 """
 SentinelAI Mission Planner Wrapper Agent
 
-Optimized Wrapper
-- Reuses ADK Runner
-- Reuses ADK Session
-- Async-only (no asyncio.run())
+The ONLY Gemini wrapper in SentinelAI.
+
+Architecture
+
+Coordinator
+        ↓
+MissionPlannerAgent
+        ↓
+ADK Runner
+        ↓
+Gemini
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -47,7 +56,7 @@ class MissionPlannerAgent:
 
     async def run_async(
         self,
-        query: str,
+        prompt: str,
     ) -> str:
 
         session = await self._get_session()
@@ -56,7 +65,7 @@ class MissionPlannerAgent:
             role="user",
             parts=[
                 types.Part(
-                    text=query,
+                    text=prompt,
                 )
             ],
         )
@@ -82,3 +91,12 @@ class MissionPlannerAgent:
                     response += part.text
 
         return response.strip()
+
+    def run(
+        self,
+        prompt: str,
+    ) -> str:
+
+        return asyncio.run(
+            self.run_async(prompt)
+        )

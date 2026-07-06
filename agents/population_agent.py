@@ -55,7 +55,14 @@ class PopulationAgent:
             role="user",
             parts=[
                 types.Part(
-                    text=f"What is the population of {location}?"
+                    text=f"""
+What is the population of {location}?
+
+Return:
+- Population
+- Density (if available)
+- Demographic summary
+"""
                 )
             ],
         )
@@ -81,3 +88,14 @@ class PopulationAgent:
                     response += part.text
 
         return response.strip()
+
+    def run(
+        self,
+        location: str,
+    ) -> str:
+
+        import asyncio
+
+        return asyncio.run(
+            self.run_async(location)
+        )

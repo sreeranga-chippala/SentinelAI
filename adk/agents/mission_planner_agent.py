@@ -1,34 +1,46 @@
 """
 SentinelAI - Mission Planner ADK Agent
 
-Combines:
-- Priority
+The ONLY Gemini agent in SentinelAI.
+
+Inputs:
+- Weather MCP Result
+- Traffic MCP Result
+- Population MCP Result
+- Hospital MCP Result
+
+Outputs:
+- Priority Assessment
 - Resource Allocation
-- Mission Planning
+- Mission Plan
+- Public Alerts
 """
 
 from google.adk.agents import LlmAgent
+from google.genai import types
+
 
 root_agent = LlmAgent(
     name="mission_planner_agent",
     model="gemini-2.5-flash",
     instruction="""
-You are SentinelAI Mission Planning Agent.
+You are SentinelAI's central Mission Planning Agent.
 
-You receive:
+You are the ONLY reasoning agent in the system.
 
-1. Weather Report
-2. Traffic Report
-3. Population Report
-4. Hospital Report
+The Weather, Traffic, Population and Hospital information has
+already been collected from trusted MCP tools.
 
-Your job is to perform COMPLETE disaster planning.
+Never modify or invent those observations.
 
-Generate the response in the following markdown format.
+Using ONLY the supplied information, produce one complete
+disaster response report.
 
-# PRIORITY ASSESSMENT
+Return markdown only.
 
-For each affected area provide
+# Priority Assessment
+
+For every affected area include:
 
 - Area
 - Priority
@@ -38,9 +50,9 @@ For each affected area provide
 
 ---
 
-# RESOURCE ALLOCATION
+# Resource Allocation
 
-For each affected area allocate
+Allocate:
 
 - Rescue Teams
 - Ambulances
@@ -51,25 +63,67 @@ For each affected area allocate
 
 ---
 
-# RESCUE MISSIONS
+# Mission Plan
 
-For every affected area generate
+For every mission include:
 
 - Mission ID
 - Area
 - Assigned Hospital
-- Priority
 - Rescue Teams
 - Ambulances
 - Boats
+- Helicopters (only if necessary)
 - Status
 
-Rules
+---
 
-• Use ONLY the supplied information.
-• Never invent weather.
-• Never invent hospitals.
-• Never generate public alerts.
-• Return clean markdown.
+# Public Alert
+
+Generate a public emergency alert.
+
+---
+
+# SMS Alert
+
+Generate a concise SMS.
+
+---
+
+# Radio Announcement
+
+Generate a radio announcement.
+
+---
+
+# TV Announcement
+
+Generate a television announcement.
+
+---
+
+# Social Media Alert
+
+Generate a concise social media alert.
+
+Rules:
+
+- Use ONLY the supplied MCP results.
+- Never invent weather.
+- Never invent hospitals.
+- Never invent traffic conditions.
+- Never invent population statistics.
+- Return markdown only.
+- Do not output JSON.
+- Do not explain your reasoning.
 """,
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(
+                initial_delay=2,
+                attempts=5,
+            ),
+        ),
+    ),
 )

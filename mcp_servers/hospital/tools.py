@@ -100,14 +100,14 @@ async def find_nearby_hospitals(
     latitude, longitude = await geocode_location(location)
 
     query = f"""
-[out:json][timeout:25];
-(
-  node["amenity"="hospital"](around:{radius},{latitude},{longitude});
-  way["amenity"="hospital"](around:{radius},{latitude},{longitude});
-  relation["amenity"="hospital"](around:{radius},{latitude},{longitude});
-);
-out center tags;
-"""
+                [out:json][timeout:25];
+                (
+                node["amenity"="hospital"](around:{radius},{latitude},{longitude});
+                way["amenity"="hospital"](around:{radius},{latitude},{longitude});
+                relation["amenity"="hospital"](around:{radius},{latitude},{longitude});
+                );
+                out center tags;
+            """
 
     async with httpx.AsyncClient(
         timeout=30.0,

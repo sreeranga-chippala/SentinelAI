@@ -4,9 +4,12 @@ SentinelAI Hospital Wrapper Agent
 Optimized Wrapper
 - Reuses ADK Runner
 - Reuses ADK Session
+- Handles MCP failures gracefully
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -58,7 +61,12 @@ class HospitalAgent:
                     text=f"""
 Find nearby hospitals in {location}.
 
-Return only the nearest hospitals.
+Return only
+
+- Hospital Name
+- Emergency Facility
+- Phone Number
+- Coordinates
 """
                 )
             ],
@@ -66,22 +74,66 @@ Return only the nearest hospitals.
 
         response = ""
 
-        async for event in self.runner.run_async(
-            user_id=self.user_id,
-            session_id=session.id,
-            new_message=message,
-        ):
+        try:
 
-            if not event.content:
-                continue
+            async for event in self.runner.run_async(
+                user_id=self.user_id,
+                session_id=session.id,
+                new_message=message,
+            ):
 
-            if not event.content.parts:
-                continue
+                if not event.content:
+                    continue
 
-            for part in event.content.parts:
+                if not event.content.parts:
+                    continue
 
-                if getattr(part, "text", None):
+                for part in event.content.parts:
 
-                    response += part.text
+                    if getattr(part, "text", None):
+                        response += part.text
 
-        return response.strip()
+        except Exception as exc:
+
+            return f"ERROR: Hospital MCP failed ({exc})"
+
+        response = response.strip()
+
+        if not response:
+
+            return "ERROR: Hospital MCP returned an empty response."
+
+        lower = response.lower()
+
+        failure_keywords = (
+            "i am sorry",
+            "unable",
+            "unavailable",
+            "cannot",
+            "can't",
+            "failed",
+            "failure",
+            "timeout",
+            "timed out",
+            "error",
+            "internal server",
+            "service unavailable",
+        )
+
+        if any(keyword in lower for keyword in failure_keywords):
+
+            return (
+                "ERROR: Hospital service is temporarily unavailable. "
+                "Unable to retrieve nearby hospitals."
+            )
+
+        return response
+
+    def run(
+        self,
+        location: str,
+    ) -> str:
+
+        return asyncio.run(
+            self.run_async(location)
+        )

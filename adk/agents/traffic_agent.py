@@ -1,36 +1,72 @@
 """
-SentinelAI - Traffic ADK Agent
+SentinelAI Traffic ADK Agent
 
-Google ADK Traffic Agent backed by the Traffic MCP Server.
+Uses the Traffic MCP Server through Google ADK.
 """
 
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent
-from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+from google.adk.tools.mcp_tool import McpToolset
+from google.genai import types
 
-from mcp_servers.traffic.client import get_traffic_connection
+from mcp_servers.traffic.client import (
+    get_traffic_connection,
+)
 
+# --------------------------------------------------------
+# Create ONE MCP Toolset for the application's lifetime
+# --------------------------------------------------------
+
+traffic_toolset = McpToolset(
+    connection_params=get_traffic_connection(),
+)
+
+# --------------------------------------------------------
 
 root_agent = LlmAgent(
+
     name="traffic_agent",
-    model="gemini-2.5-flash",
+
+    model="gemini-2.5-flash-lite",
+
     instruction="""
 You are SentinelAI's Traffic Intelligence Agent.
 
-Your responsibilities are:
+Always use the Traffic MCP tools.
 
-- Analyze road conditions.
-- Calculate driving routes.
-- Estimate travel distance.
-- Estimate travel duration.
-- Always use the Traffic MCP tools.
-- Never hallucinate traffic information.
-- Return concise structured traffic observations.
+Never guess routes.
+
+Return only:
+
+- Route
+- Distance
+- Duration
+- Road Status
+
+Keep the response concise.
 """,
-    tools=[
-        McpToolset(
-            connection_params=get_traffic_connection(),
+
+    generate_content_config=types.GenerateContentConfig(
+
+        temperature=0,
+
+        http_options=types.HttpOptions(
+
+            retry_options=types.HttpRetryOptions(
+
+                initial_delay=2,
+
+                attempts=5,
+
+            ),
+
         ),
+
+    ),
+
+    tools=[
+        traffic_toolset,
     ],
+
 )

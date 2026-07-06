@@ -1,8 +1,7 @@
 """
 SentinelAI - Population MCP Client
 
-Provides MCP connection parameters for the Google ADK
-Population Agent.
+Provides a singleton MCP connection for the Population Server.
 """
 
 from __future__ import annotations
@@ -16,19 +15,33 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 from mcp import StdioServerParameters
 
 
+_connection: StdioConnectionParams | None = None
+
+
 def get_population_connection() -> StdioConnectionParams:
     """
-    Returns the stdio connection parameters required
-    by MCPToolset.
+    Returns a singleton MCP connection.
     """
 
-    return StdioConnectionParams(
-        server_params=StdioServerParameters(
-            command=sys.executable,
-            args=[
-                "-m",
-                "mcp_servers.population.server",
-            ],
-        ),
-        timeout=30,
-    )
+    global _connection
+
+    if _connection is None:
+
+        _connection = StdioConnectionParams(
+
+            server_params=StdioServerParameters(
+
+                command=sys.executable,
+
+                args=[
+                    "-m",
+                    "mcp_servers.population.server",
+                ],
+
+            ),
+
+            timeout=120,
+
+        )
+
+    return _connection

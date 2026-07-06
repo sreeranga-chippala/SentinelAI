@@ -1,13 +1,23 @@
 """
 SentinelAI Coordinator
 
-Coordinator
-    ↓
-Wrapper Agents
-    ↓
-ADK
-    ↓
-MCP
+Architecture
+
+                Coordinator
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+   Weather MCP   Traffic MCP   Population MCP
+        │
+   Hospital MCP
+        │
+   (Parallel Execution)
+        │
+        ▼
+ Mission Planner (Only Gemini Call)
+        │
+        ▼
+     World State
 """
 
 from __future__ import annotations
@@ -33,23 +43,48 @@ class Coordinator:
         self.population = PopulationAgent()
         self.hospital = HospitalAgent()
 
+        # Only reasoning LLM
         self.mission_planner = MissionPlannerAgent()
 
-    # =========================================================
+    # =====================================================
+    # Execute Individual Agent
+    # =====================================================
 
     async def _run_agent(
         self,
         name: str,
-        coro,
+        coroutine,
     ):
 
         start = time.perf_counter()
 
         try:
 
-            result = await coro
+            result = await coroutine
 
-            success = True
+            result_text = str(result).lower()
+
+            failure_keywords = (
+
+                "error:",
+                "unable",
+                "unavailable",
+                "failed",
+                "failure",
+                "timeout",
+                "timed out",
+                "cannot",
+                "can't",
+                "i am sorry",
+                "service unavailable",
+                "internal server",
+
+            )
+
+            success = not any(
+                keyword in result_text
+                for keyword in failure_keywords
+            )
 
         except Exception as exc:
 
@@ -74,9 +109,11 @@ class Coordinator:
             success,
         )
 
-        return result
+        return result, success
 
-    # =========================================================
+    # =====================================================
+    # Execute Complete Simulation
+    # =====================================================
 
     async def execute_cycle(
         self,
@@ -92,19 +129,19 @@ class Coordinator:
             f"Starting disaster cycle for {disaster_area}"
         )
 
-        # =====================================================
-        # Run all MCP Agents in parallel
-        # =====================================================
+        origin = "Kempegowda International Airport"
 
         weather_task = self._run_agent(
             "Weather",
-            self.weather.run_async(disaster_area),
+            self.weather.run_async(
+                disaster_area,
+            ),
         )
 
         traffic_task = self._run_agent(
             "Traffic",
             self.traffic.run_async(
-                "Bengaluru",
+                origin,
                 disaster_area,
             ),
         )
@@ -123,15 +160,22 @@ class Coordinator:
             ),
         )
 
-        weather, traffic, population, hospital = await asyncio.gather(
+        (
+            (weather, weather_ok),
+            (traffic, traffic_ok),
+            (population, population_ok),
+            (hospital, hospital_ok),
+        ) = await asyncio.gather(
+
             weather_task,
             traffic_task,
             population_task,
             hospital_task,
+
         )
 
         # =====================================================
-        # Store MCP Results
+        # Save MCP Outputs
         # =====================================================
 
         self.world_state.update_input(
@@ -155,30 +199,74 @@ class Coordinator:
         )
 
         # =====================================================
-        # Mission Planner
+        # Determine if Planner can run
         # =====================================================
 
-        mission_plan = await self._run_agent(
-            "Mission Planner",
-            self.mission_planner.run_async(
-                f"""
-Weather
+        mcp_failed = not all(
+
+            (
+                weather_ok,
+                traffic_ok,
+                population_ok,
+                hospital_ok,
+            )
+
+        )
+
+        if mcp_failed:
+
+            mission_plan = """
+# Mission Planner
+
+Unable to generate a disaster response.
+
+One or more MCP services failed.
+
+Please retry the simulation.
+"""
+
+            self.world_state.update_agent_metric(
+
+                "Mission Planner",
+
+                0,
+
+                False,
+
+            )
+
+            self.world_state.add_log(
+
+                "Mission Planner skipped because an MCP service failed."
+
+            )
+
+        else:
+
+            planner_prompt = f"""
+You are SentinelAI's Mission Planner.
+
+The following reports are trusted outputs from MCP tools.
+
+================ WEATHER ================
 
 {weather}
 
-Traffic
+================ TRAFFIC ================
 
 {traffic}
 
-Population
+================ POPULATION ================
 
 {population}
 
-Hospitals
+================ HOSPITAL ================
 
 {hospital}
 
-Generate ONE complete disaster response report.
+Using ONLY these reports generate ONE comprehensive disaster response.
+
+Return Markdown only.
 
 Include:
 
@@ -186,14 +274,30 @@ Include:
 
 # Resource Allocation
 
-# Rescue Missions
+# Mission Plan
 
-# Public Alerts
+# Public Alert
 
-Return Markdown only.
-"""
-            ),
-        )
+# SMS Alert
+
+# Radio Announcement
+
+# TV Announcement
+
+# Social Media Alert
+
+Rules:
+
+- Never invent information.
+- Never modify MCP results.
+- Use ONLY the supplied reports.
+"""            
+            mission_plan, _ = await self._run_agent(
+                "Mission Planner",
+                self.mission_planner.run_async(
+                    planner_prompt,
+                ),
+            )
 
         # =====================================================
         # Save Planner Output
@@ -231,7 +335,7 @@ Return Markdown only.
         )
 
         # =====================================================
-        # Finish
+        # Finish Cycle
         # =====================================================
 
         self.world_state.increment_cycle()
@@ -247,7 +351,9 @@ Return Markdown only.
             "IDLE",
         )
 
-    # =========================================================
+    # =====================================================
+    # Public Entry Point
+    # =====================================================
 
     def run(
         self,

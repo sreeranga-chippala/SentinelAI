@@ -1,73 +1,105 @@
 """
-SentinelAI Weather ADK Agent
+SentinelAI Weather Wrapper Agent
 
-Uses the Weather MCP Server through Google ADK.
+Optimized Wrapper
+- Reuses ADK Runner
+- Reuses ADK Session
 """
 
 from __future__ import annotations
 
-from google.adk.agents import LlmAgent
-from google.adk.tools.mcp_tool import McpToolset
+import asyncio
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from mcp_servers.weather.client import (
-    get_weather_connection,
-)
+from adk.agents.weather_agent import root_agent
 
-# --------------------------------------------------------
-# Create ONE MCP Toolset for the application's lifetime
-# --------------------------------------------------------
 
-weather_toolset = McpToolset(
-    connection_params=get_weather_connection(),
-)
+class WeatherAgent:
 
-# --------------------------------------------------------
+    def __init__(self):
 
-root_agent = LlmAgent(
+        self.app_name = "SentinelAI"
 
-    name="weather_agent",
+        self.user_id = "weather_user"
 
-    model="gemini-2.5-flash-lite",
+        self.session_service = InMemorySessionService()
 
-    instruction="""
-You are SentinelAI's Weather Intelligence Agent.
+        self.runner = Runner(
+            app_name=self.app_name,
+            agent=root_agent,
+            session_service=self.session_service,
+        )
 
-Always use the Weather MCP tool.
+        self.session = None
 
-Never answer using your own knowledge.
+    async def _get_session(self):
 
-Return only:
+        if self.session is None:
 
+            self.session = await self.session_service.create_session(
+                app_name=self.app_name,
+                user_id=self.user_id,
+            )
+
+        return self.session
+
+    async def run_async(
+        self,
+        location: str,
+    ) -> str:
+
+        session = await self._get_session()
+
+        message = types.Content(
+            role="user",
+            parts=[
+                types.Part(
+                    text=f"""
+Get the current weather for {location}.
+
+Return:
 - Weather Condition
 - Temperature
 - Feels Like
 - Humidity
 - Wind Speed
+"""
+                )
+            ],
+        )
 
-Keep the response concise.
-""",
+        response = ""
 
-    generate_content_config=types.GenerateContentConfig(
+        async for event in self.runner.run_async(
+            user_id=self.user_id,
+            session_id=session.id,
+            new_message=message,
+        ):
 
-        temperature=0,
+            if not event.content:
+                continue
 
-        http_options=types.HttpOptions(
+            if not event.content.parts:
+                continue
 
-            retry_options=types.HttpRetryOptions(
+            for part in event.content.parts:
 
-                initial_delay=2,
+                if getattr(part, "text", None):
 
-                attempts=5,
+                    response += part.text
 
-            ),
+        return response.strip()
 
-        ),
+    def run(
+        self,
+        location: str,
+    ) -> str:
 
-    ),
-
-    tools=[
-        weather_toolset,
-    ],
-
-)
+        return asyncio.run(
+            self.run_async(
+                location,
+            )
+        )
